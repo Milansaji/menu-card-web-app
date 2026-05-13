@@ -167,8 +167,8 @@ const TrackOrder = () => {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-white text-center p-8">
         <div className="w-16 h-16 border-4 border-indigo-50 border-t-indigo-600 rounded-full animate-spin mb-6" />
-        <h2 className="text-lg font-black text-gray-900 uppercase tracking-tighter">Initializing Link</h2>
-        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mt-2">Checking Table Context...</p>
+        <h2 className="text-lg font-black text-gray-900 uppercase tracking-tighter">Syncing Table</h2>
+        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mt-2">Connecting to Kitchen...</p>
       </div>
     );
   }
@@ -181,7 +181,7 @@ const TrackOrder = () => {
             <ArrowLeft size={20} strokeWidth={2.5} />
           </button>
           <div>
-            <h1 className="text-2xl font-black tracking-tighter text-gray-900 uppercase leading-none">Order Status</h1>
+            <h1 className="text-2xl font-black tracking-tighter text-gray-900 uppercase leading-none">Live Tracker</h1>
             <p className="text-[10px] text-gray-400 font-black uppercase tracking-widest mt-1.5 flex items-center gap-2">
               <MapPin size={10} className="text-indigo-500" />
               {tableNumber ? `Table ${tableNumber}` : 'Scanning...'}
@@ -207,17 +207,17 @@ const TrackOrder = () => {
         </div>
       )}
 
-      {activeOrders.length === 0 && pastOrders.length === 0 ? (
+      {activeOrders.length === 0 ? (
         <div className="text-center py-20 px-8 bg-white rounded-[2.5rem] border border-gray-100 shadow-sm space-y-8">
           <div className="w-20 h-20 bg-indigo-50 rounded-full flex items-center justify-center text-indigo-500 mx-auto">
             <Utensils size={32} />
           </div>
           <div className="space-y-3">
-            <h2 className="text-xl font-black text-gray-900 uppercase tracking-tighter">Nothing in the Oven</h2>
-            <p className="text-xs text-gray-400 font-medium leading-relaxed">We couldn't find any live sessions for Table {tableNumber || '?'}. Scan the QR code again if you have already ordered.</p>
+            <h2 className="text-xl font-black text-gray-900 uppercase tracking-tighter">No Active Orders</h2>
+            <p className="text-xs text-gray-400 font-medium leading-relaxed">Everything is settled! If you just ordered, please wait a moment for the kitchen to confirm.</p>
           </div>
           <Button onClick={() => navigate(`/menu/main${tableNumber ? `?table=${tableNumber}` : ''}`)} className="w-full py-5 rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl shadow-indigo-100">
-            View Menu
+            Open Menu
           </Button>
         </div>
       ) : (
@@ -283,43 +283,11 @@ const TrackOrder = () => {
               </Card>
             </div>
           ))}
-
-          {pastOrders.length > 0 && (
-            <div className="space-y-6">
-              <div className="flex items-center gap-3 ml-2">
-                <History size={16} className="text-gray-400" />
-                <h2 className="text-[10px] font-black text-gray-400 uppercase tracking-widest">History</h2>
-              </div>
-              <div className="space-y-4">
-                {pastOrders.map(order => (
-                  <Card key={order.id} className="border border-gray-100 shadow-sm rounded-3xl" padding="p-5">
-                    <div className="flex justify-between items-center">
-                      <div className="flex items-center gap-4">
-                        <div className="w-12 h-12 bg-gray-50 text-indigo-600 rounded-2xl flex items-center justify-center font-black text-xs border border-gray-100">
-                          {order.tableNumber}
-                        </div>
-                        <div>
-                          <p className="text-xs font-black text-gray-900 uppercase tracking-tight">#{order.invoiceNumber}</p>
-                          <p className="text-[9px] text-gray-400 font-bold uppercase">{order.date?.toDate ? format(order.date.toDate(), 'dd MMM • HH:mm') : ''}</p>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-sm font-black text-emerald-600 tracking-tighter">₹{order.totalAmount?.toLocaleString()}</p>
-                        <div className="flex items-center justify-end gap-1 mt-0.5">
-                          <CheckCircle2 size={10} className="text-emerald-500" />
-                          <span className="text-[9px] font-black uppercase tracking-widest text-emerald-500">Paid</span>
-                        </div>
-                      </div>
-                    </div>
-                  </Card>
-                ))}
-              </div>
-            </div>
-          )}
         </div>
       )}
     </div>
   );
 };
+
 
 export default TrackOrder;
