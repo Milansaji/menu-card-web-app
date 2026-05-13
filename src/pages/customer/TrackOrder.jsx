@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { db } from '../../firebase/firebase';
-import { doc, onSnapshot, updateDoc } from 'firebase/firestore';
+import { doc, onSnapshot, updateDoc, collection, query, where } from 'firebase/firestore';
 import { useNavigate, Link } from 'react-router-dom';
 import { useCart } from '../../contexts/CartContext';
 import { ArrowLeft, Clock, CheckCircle2, ShoppingBag, Receipt, MapPin, Hash, ChefHat, Sparkles, History, RotateCw, Navigation } from 'lucide-react';
@@ -19,62 +19,78 @@ const TrackOrder = () => {
   const unsubscribesRef = useRef([]);
 
   const syncOrders = useCallback(() => {
-    const existingHistory = localStorage.getItem('myOrders');
-    let orderIds = [];
-    try {
-      orderIds = existingHistory ? JSON.parse(existingHistory) : [];
-      if (!Array.isArray(orderIds)) orderIds = [];
-    } catch (e) {
-      orderIds = [];
-    }
-    
-    if (orderIds.length === 0) {
-      setLoading(false);
-      return;
-    }
-
     setIsRefreshing(true);
+    
     // Clear previous listeners
     unsubscribesRef.current.forEach(unsub => unsub());
     unsubscribesRef.current = [];
 
-    let processedCount = 0;
-    const totalIds = orderIds.length;
+    const existingHistory = localStorage.getItem('myOrders');
+    let personalOrderIds = [];
+    try {
+      personalOrderIds = existingHistory ? JSON.parse(existingHistory) : [];
+      if (!Array.isArray(personalOrderIds)) personalOrderIds = [];
+    } catch (e) { personalOrderIds = []; }
 
-    const newUnsubs = orderIds.map(id => 
-      onSnapshot(doc(db, 'bills', id), (snapshot) => {
+    // 1. Listen for Table-wide Active Orders (The "Zomato" experience - anyone at the table sees the status)
+    if (tableNumber) {
+      const tableQuery = query(
+        collection(db, 'bills'), 
+        where('tableNumber', '==', String(tableNumber)),
+        where('status', '!=', 'paid')
+      );
+
+      const unsubTable = onSnapshot(tableQuery, (snapshot) => {
+        const tableActiveOrders = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        
+        setActiveOrders(prev => {
+          // Merge table orders with personal orders, avoiding duplicates
+          const personalOnly = prev.filter(p => !tableActiveOrders.some(t => t.id === p.id));
+          return [...tableActiveOrders, ...personalOnly].sort((a, b) => (b.date?.seconds || 0) - (a.date?.seconds || 0));
+        });
+        
+        setLoading(false);
+        setIsRefreshing(false);
+      }, (err) => {
+        console.error("Table sync error:", err);
+        setLoading(false);
+      });
+      unsubscribesRef.current.push(unsubTable);
+    }
+
+    // 2. Listen for Personal Order History (IDs stored on this device)
+    personalOrderIds.forEach(id => {
+      const unsubPersonal = onSnapshot(doc(db, 'bills', id), (snapshot) => {
         if (snapshot.exists()) {
           const data = snapshot.data();
           const orderObj = { id: snapshot.id, ...data };
 
-          if (data.status !== 'paid') {
-            setActiveOrders(prev => {
-              const other = prev.filter(o => o.id !== id);
-              return [...other, orderObj].sort((a, b) => (b.date?.seconds || 0) - (a.date?.seconds || 0));
-            });
-          } else {
+          if (data.status === 'paid') {
+            // Move to history if paid
             setActiveOrders(prev => prev.filter(o => o.id !== id));
             setPastOrders(prev => {
               const other = prev.filter(o => o.id !== id);
               return [...other, orderObj].sort((a, b) => (b.date?.seconds || 0) - (a.date?.seconds || 0));
             });
+          } else {
+            // Update active orders
+            setActiveOrders(prev => {
+              const other = prev.filter(o => o.id !== id);
+              return [...other, orderObj].sort((a, b) => (b.date?.seconds || 0) - (a.date?.seconds || 0));
+            });
           }
         }
-        
-        // This ensures we only stop loading once we've at least tried to hit every ID
-        processedCount++;
-        if (processedCount >= totalIds) {
-          setLoading(false);
-          setIsRefreshing(false);
-        }
-      }, (err) => {
-        console.error(`Sync error for ${id}:`, err);
-        processedCount++;
-        if (processedCount >= totalIds) setLoading(false);
-      })
-    );
+        setLoading(false);
+        setIsRefreshing(false);
+      });
+      unsubscribesRef.current.push(unsubPersonal);
+    });
 
-    unsubscribesRef.current = newUnsubs;
+    // Fallback if no table and no history
+    if (!tableNumber && personalOrderIds.length === 0) {
+      setLoading(false);
+      setIsRefreshing(false);
+    }
   }, [tableNumber]);
 
   useEffect(() => {
@@ -82,7 +98,7 @@ const TrackOrder = () => {
     return () => unsubscribesRef.current.forEach(unsub => unsub());
   }, [syncOrders]);
 
-  // Auto-status simulation (Zomato-style feedback)
+  // Auto-status simulation
   useEffect(() => {
     if (activeOrders.length === 0) return;
     const timer = setInterval(() => {
@@ -131,8 +147,10 @@ const TrackOrder = () => {
             <ArrowLeft size={24} strokeWidth={2.5} className="text-gray-900" />
           </button>
           <div>
-            <h1 className="text-3xl font-black tracking-tighter text-gray-900 uppercase leading-none">Your Orders</h1>
-            <p className="text-[10px] text-gray-400 font-black uppercase tracking-widest mt-2">Live Tracking Center</p>
+            <h1 className="text-3xl font-black tracking-tighter text-gray-900 uppercase leading-none">Live Tracking</h1>
+            <p className="text-[10px] text-gray-400 font-black uppercase tracking-widest mt-2">
+              {tableNumber ? `Table ${tableNumber} Command Center` : 'Guest Session Tracking'}
+            </p>
           </div>
         </div>
         <button 
@@ -153,17 +171,16 @@ const TrackOrder = () => {
           </div>
           <div className="space-y-3 px-8">
             <h2 className="text-2xl font-black text-gray-900 uppercase tracking-tighter">Kitchen is Quiet</h2>
-            <p className="text-gray-400 text-sm font-medium leading-relaxed">You haven't placed any orders in this session yet. Let's fix that!</p>
+            <p className="text-gray-400 text-sm font-medium leading-relaxed">No active orders found for this table. Scan a QR code or place a new order to begin.</p>
           </div>
           <Link to="/menu/main" className="inline-block">
-            <Button className="px-12 py-5 shadow-2xl shadow-indigo-100 rounded-2xl text-xs font-black uppercase tracking-widest">
+            <Button className="px-12 py-5 shadow-2xl shadow-indigo-200 rounded-2xl text-xs font-black uppercase tracking-widest">
               Explore Menu
             </Button>
           </Link>
         </div>
       ) : (
         <div className="space-y-16">
-          {/* Active Orders - Zomato Style */}
           {activeOrders.map(order => {
             const step = getStatusStep(order.deliveryStatus);
             return (
@@ -171,7 +188,7 @@ const TrackOrder = () => {
                 <div className="absolute -top-4 -right-4 z-10">
                   <div className="bg-indigo-600 text-white px-4 py-2 rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl flex items-center gap-2">
                     <span className="w-2 h-2 bg-white rounded-full animate-pulse" />
-                    Live
+                    Live Status
                   </div>
                 </div>
                 
@@ -179,7 +196,7 @@ const TrackOrder = () => {
                   <div className="p-8 bg-linear-to-br from-indigo-600 to-violet-800 text-white">
                     <div className="flex justify-between items-start mb-8">
                       <div>
-                        <p className="text-[10px] text-indigo-200 font-black uppercase tracking-[0.2em] mb-1.5">Order from Cafe Sunrise</p>
+                        <p className="text-[10px] text-indigo-200 font-black uppercase tracking-[0.2em] mb-1.5">Table {order.tableNumber} Order</p>
                         <h2 className="text-3xl font-black tracking-tighter uppercase leading-none">#{order.invoiceNumber}</h2>
                       </div>
                       <div className="w-14 h-14 bg-white/10 rounded-2xl flex items-center justify-center backdrop-blur-md border border-white/10">
@@ -189,26 +206,25 @@ const TrackOrder = () => {
                     
                     <div className="flex items-center gap-8">
                       <div className="flex flex-col">
-                        <span className="text-[10px] text-indigo-300 font-black uppercase tracking-widest mb-1">Estimate</span>
+                        <span className="text-[10px] text-indigo-300 font-black uppercase tracking-widest mb-1">Time Estimate</span>
                         <span className="text-xl font-black tracking-tighter">{order.totalCookingTime || 15} Mins</span>
                       </div>
                       <div className="w-[1px] h-8 bg-white/20" />
                       <div className="flex flex-col">
-                        <span className="text-[10px] text-indigo-300 font-black uppercase tracking-widest mb-1">Table</span>
-                        <span className="text-xl font-black tracking-tighter">{order.tableNumber}</span>
+                        <span className="text-[10px] text-indigo-300 font-black uppercase tracking-widest mb-1">Status</span>
+                        <span className="text-xl font-black tracking-tighter uppercase">{order.deliveryStatus || 'Received'}</span>
                       </div>
                     </div>
                   </div>
 
                   <div className="p-10 space-y-12">
-                    {/* Zomato Style Step Tracker */}
                     <div className="relative">
                       <div className="absolute left-6 top-2 bottom-2 w-0.5 bg-gray-50 -z-0" />
                       <div className="space-y-10 relative z-10">
                         {[
-                          { id: 1, label: 'Order Received', desc: 'Kitchen is validating your items', icon: Receipt },
-                          { id: 2, label: 'Preparing Meal', desc: 'Chef is crafting your selection', icon: ChefHat },
-                          { id: 3, label: 'Served Hot', desc: 'Enjoy your culinary journey', icon: CheckCircle2 }
+                          { id: 1, label: 'Order Confirmed', desc: 'Received by kitchen team', icon: Receipt },
+                          { id: 2, label: 'Chef is Cooking', desc: 'Crafting your culinary delight', icon: ChefHat },
+                          { id: 3, label: 'Ready to Serve', desc: 'On its way to your table', icon: CheckCircle2 }
                         ].map((item) => (
                           <div key={item.id} className={`flex items-start gap-6 transition-all duration-700 ${step < item.id ? 'opacity-30 grayscale' : 'opacity-100'}`}>
                             <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 shadow-lg ${step >= item.id ? 'bg-emerald-500 text-white shadow-emerald-200' : 'bg-gray-50 text-gray-300 shadow-none'}`}>
@@ -233,7 +249,7 @@ const TrackOrder = () => {
                         </div>
                       ))}
                       <div className="flex justify-between items-end pt-4">
-                        <span className="text-[10px] text-gray-300 font-black uppercase tracking-widest">Grand Total</span>
+                        <span className="text-[10px] text-gray-300 font-black uppercase tracking-widest">Payable Total</span>
                         <span className="text-2xl font-black text-indigo-600 tracking-tighter">₹{order.totalAmount?.toLocaleString()}</span>
                       </div>
                     </div>
@@ -243,12 +259,11 @@ const TrackOrder = () => {
             );
           })}
 
-          {/* Past Sessions - Minimal & Clean */}
           {pastOrders.length > 0 && (
             <div className="space-y-8">
               <div className="flex items-center gap-4 ml-2">
                 <History size={18} className="text-gray-400" />
-                <h2 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.25em]">Past Sessions</h2>
+                <h2 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.25em]">Session History</h2>
                 <div className="h-[1px] flex-1 bg-gray-100" />
               </div>
               <div className="grid grid-cols-1 gap-4">
