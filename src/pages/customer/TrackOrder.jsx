@@ -3,7 +3,7 @@ import { db } from '../../firebase/firebase';
 import { doc, onSnapshot, updateDoc } from 'firebase/firestore';
 import { useNavigate, Link } from 'react-router-dom';
 import { useCart } from '../../contexts/CartContext';
-import { ArrowLeft, Clock, CheckCircle2, ShoppingBag, Receipt, MapPin, Hash, ChefHat } from 'lucide-react';
+import { ArrowLeft, Clock, CheckCircle2, ShoppingBag, Receipt, MapPin, Hash, ChefHat, Sparkles } from 'lucide-react';
 import Card from '../../components/Card';
 import Button from '../../components/Button';
 import { format } from 'date-fns';
@@ -22,12 +22,10 @@ const TrackOrder = () => {
       return;
     }
 
-    // Listener for all orders in local storage
     const unsubscribes = orderIds.map(id => 
       onSnapshot(doc(db, 'bills', id), (snapshot) => {
         if (snapshot.exists()) {
           const data = snapshot.data();
-          // Only show if it matches current table AND is NOT paid
           if ((!tableNumber || String(data.tableNumber) === String(tableNumber)) && data.status !== 'paid') {
             setOrders(prev => {
               const otherOrders = prev.filter(o => o.id !== id);
@@ -35,7 +33,6 @@ const TrackOrder = () => {
                 .sort((a, b) => (b.date?.seconds || 0) - (a.date?.seconds || 0));
             });
           } else {
-            // Remove from state if it was there and now it's paid or table mismatch
             setOrders(prev => prev.filter(o => o.id !== id));
           }
         }
@@ -46,13 +43,12 @@ const TrackOrder = () => {
     return () => unsubscribes.forEach(unsub => unsub());
   }, [tableNumber]);
 
-  // Auto-status transition logic
   useEffect(() => {
     if (orders.length === 0) return;
 
     const timer = setInterval(() => {
       orders.forEach(async (order) => {
-        if (order.status === 'paid') return; // Don't auto-update if already paid
+        if (order.status === 'paid') return;
         
         const now = new Date();
         const placedAt = order.date?.toDate();
@@ -63,14 +59,9 @@ const TrackOrder = () => {
         
         let targetStatus = order.deliveryStatus || 'Received';
 
-        // Logic:
-        // 0-1 min: Received
-        // 1 min to totalMinutes: Preparing
-        // After totalMinutes: Served
-        
         if (secondsElapsed > totalMinutes * 60) {
           targetStatus = 'Served';
-        } else if (secondsElapsed > 60) { // After 1 minute, move to preparing
+        } else if (secondsElapsed > 60) {
           targetStatus = 'Preparing';
         }
 
@@ -83,7 +74,7 @@ const TrackOrder = () => {
           }
         }
       });
-    }, 5000); // Check every 5 seconds
+    }, 5000);
 
     return () => clearInterval(timer);
   }, [orders]);
@@ -92,129 +83,148 @@ const TrackOrder = () => {
     switch (status) {
       case 'Preparing': return 2;
       case 'Served': return 3;
-      default: return 1; // Received
+      default: return 1;
     }
   };
 
   if (loading) {
     return (
-      <div className="p-6 space-y-6">
-        <div className="h-8 w-48 bg-gray-100 rounded animate-pulse" />
-        <div className="space-y-4">
-          {[1, 2].map(i => <div key={i} className="h-48 bg-gray-100 rounded-3xl animate-pulse" />)}
+      <div className="p-6 space-y-8 max-w-2xl mx-auto">
+        <div className="h-10 w-48 bg-gray-100 rounded-2xl animate-shimmer" />
+        <div className="space-y-6">
+          {[1, 2].map(i => <div key={i} className="h-64 bg-gray-100 rounded-[2.5rem] animate-shimmer" />)}
         </div>
       </div>
     );
   }
 
   return (
-    <div className="p-6 space-y-6 animate-in slide-in-from-right-4 duration-500 pb-24">
-      <header className="flex items-center gap-4">
-        <button onClick={() => navigate(-1)} className="p-2 hover:bg-gray-100 rounded-full">
-          <ArrowLeft size={24} />
+    <div className="p-6 space-y-8 animate-in slide-in-from-right-8 duration-700 pb-32 max-w-2xl mx-auto">
+      <header className="flex items-center gap-5">
+        <button onClick={() => navigate(-1)} className="p-3 bg-white border border-gray-100 rounded-2xl shadow-sm hover:shadow-md active:scale-90 transition-all">
+          <ArrowLeft size={24} className="text-gray-900" />
         </button>
-        <h1 className="text-2xl font-black tracking-tight">Order Status</h1>
+        <div>
+          <h1 className="text-3xl font-black tracking-tighter text-gray-900 uppercase leading-none">Order Status</h1>
+          <p className="text-xs text-gray-400 font-bold uppercase tracking-widest mt-1">Real-time updates</p>
+        </div>
       </header>
 
       {orders.length === 0 ? (
-        <div className="text-center py-20 space-y-4">
-          <div className="w-20 h-20 bg-gray-50 rounded-full flex items-center justify-center mx-auto text-gray-300">
-            <ShoppingBag size={40} />
+        <div className="text-center py-32 space-y-8 glass rounded-[3rem] border-dashed border-2 border-gray-100 mx-auto max-w-sm">
+          <div className="relative w-28 h-28 mx-auto">
+            <div className="absolute inset-0 bg-amber-100 rounded-full animate-ping opacity-20" />
+            <div className="relative w-28 h-28 bg-linear-to-br from-amber-50 to-amber-100 rounded-full flex items-center justify-center text-amber-500 shadow-inner">
+              <ShoppingBag size={56} strokeWidth={1.5} />
+            </div>
           </div>
-          <h2 className="text-xl font-bold text-gray-900">No active orders</h2>
-          <p className="text-gray-500 text-sm">You haven't placed any orders from this device yet.</p>
-          <Link to="/menu/main" className="inline-block pt-4">
-            <Button>Back to Menu</Button>
+          <div className="space-y-2">
+            <h2 className="text-2xl font-black text-gray-900 uppercase tracking-tighter">No active orders</h2>
+            <p className="text-gray-500 text-sm font-medium px-8">Your cravings haven't turned into orders yet. Let's change that!</p>
+          </div>
+          <Link to="/menu/main" className="inline-block">
+            <Button variant="primary" className="px-10 py-4 shadow-xl shadow-indigo-100">
+              Browse the Menu
+            </Button>
           </Link>
         </div>
       ) : (
-        <div className="space-y-6">
+        <div className="space-y-8">
           {orders.map(order => {
             const step = getStatusStep(order.deliveryStatus);
             return (
-              <Card key={order.id} className="overflow-hidden border-none shadow-lg shadow-gray-100" padding="p-0">
-                <div className="p-4 bg-indigo-600 text-white flex justify-between items-center">
-                  <div className="flex items-center gap-2">
-                    <Hash size={18} />
-                    <span className="font-black">#{order.invoiceNumber}</span>
+              <Card key={order.id} className="overflow-hidden border-none shadow-[0_20px_50px_rgba(0,0,0,0.05)] hover:shadow-[0_30px_60px_rgba(0,0,0,0.08)] transition-all duration-700 rounded-[2.5rem]" padding="p-0">
+                <div className="p-5 bg-linear-to-r from-indigo-600 to-violet-700 text-white flex justify-between items-center">
+                  <div className="flex items-center gap-3">
+                    <div className="bg-white/20 p-2 rounded-xl">
+                      <Hash size={18} strokeWidth={3} />
+                    </div>
+                    <span className="font-black text-lg tracking-tighter">{order.invoiceNumber}</span>
                   </div>
-                  <div className="flex items-center gap-2 bg-white/20 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider">
-                    <Clock size={14} />
+                  <div className="flex items-center gap-2 bg-white/20 backdrop-blur-md px-4 py-2 rounded-2xl text-[10px] font-black uppercase tracking-widest border border-white/10">
+                    <Sparkles size={14} className="text-amber-400" />
                     {order.status}
                   </div>
                 </div>
 
-                <div className="p-6 space-y-8">
+                <div className="p-8 space-y-10">
                   {/* Visual Status Tracker */}
-                  <div className="space-y-6">
-                    <div className="flex justify-between items-center bg-gray-50 p-4 rounded-2xl">
-                      <div className="flex items-center gap-3">
-                        <div className="p-2 bg-indigo-100 text-indigo-600 rounded-xl">
-                          <Clock size={20} />
+                  <div className="space-y-8">
+                    <div className="flex justify-between items-center bg-gray-50/50 p-5 rounded-3xl border border-gray-100">
+                      <div className="flex items-center gap-4">
+                        <div className="p-3 bg-indigo-50 text-indigo-600 rounded-2xl shadow-inner">
+                          <Clock size={24} strokeWidth={2.5} />
                         </div>
                         <div>
-                          <p className="text-[10px] text-gray-400 font-black uppercase tracking-widest">Est. Preparation</p>
-                          <p className="text-sm font-black text-gray-900">{order.totalCookingTime || 15} Minutes</p>
+                          <p className="text-[10px] text-gray-400 font-black uppercase tracking-widest mb-0.5">Est. Time</p>
+                          <p className="text-lg font-black text-gray-900">{order.totalCookingTime || 15} Minutes</p>
                         </div>
                       </div>
                       <div className="text-right">
-                        <p className="text-[10px] text-gray-400 font-black uppercase tracking-widest">Stage</p>
-                        <p className="text-sm font-black text-indigo-600">{order.deliveryStatus || 'Received'}</p>
+                        <p className="text-[10px] text-gray-400 font-black uppercase tracking-widest mb-0.5">Current Stage</p>
+                        <p className="text-lg font-black text-indigo-600 uppercase tracking-tighter">{order.deliveryStatus || 'Received'}</p>
                       </div>
                     </div>
 
-                    <div className="relative pt-2">
-                      <div className="absolute top-6 left-0 right-0 h-1.5 bg-gray-100 -z-10 rounded-full" />
-                      <div className={`absolute top-6 left-0 h-1.5 bg-green-500 -z-10 transition-all duration-1000 rounded-full`} style={{ width: `${((step - 1) / 2) * 100}%` }} />
+                    <div className="relative px-2">
+                      <div className="absolute top-6 left-6 right-6 h-2 bg-gray-100 -z-10 rounded-full" />
+                      <div className="absolute top-6 left-6 h-2 bg-linear-to-r from-green-400 to-emerald-600 -z-10 transition-all duration-1000 rounded-full shadow-[0_0_10px_rgba(52,211,153,0.5)]" style={{ width: `calc(${((step - 1) / 2) * 100}% - 12px)` }} />
                       
                       <div className="flex justify-between">
-                        <div className="flex flex-col items-center gap-2">
-                          <div className={`w-10 h-10 rounded-full flex items-center justify-center transition-all ${step >= 1 ? 'bg-green-500 text-white shadow-lg shadow-green-100 scale-110' : 'bg-white border-2 border-gray-100 text-gray-300'}`}>
-                            <Receipt size={18} />
+                        {[
+                          { id: 1, label: 'Received', icon: Receipt },
+                          { id: 2, label: 'Preparing', icon: ChefHat },
+                          { id: 3, label: 'Served', icon: CheckCircle2 }
+                        ].map((item) => (
+                          <div key={item.id} className="flex flex-col items-center gap-3">
+                            <div className={`w-14 h-14 rounded-[1.25rem] flex items-center justify-center transition-all duration-700 ${step >= item.id ? 'bg-linear-to-br from-green-400 to-emerald-600 text-white shadow-xl shadow-emerald-100 scale-110' : 'bg-white border-2 border-gray-50 text-gray-300'}`}>
+                              <item.icon size={26} strokeWidth={2.5} className={step === item.id ? 'animate-pulse' : ''} />
+                            </div>
+                            <span className={`text-[10px] font-black uppercase tracking-widest ${step >= item.id ? 'text-emerald-600' : 'text-gray-400'}`}>{item.label}</span>
                           </div>
-                          <span className={`text-[10px] font-black uppercase tracking-tighter ${step >= 1 ? 'text-green-600' : 'text-gray-400'}`}>Received</span>
-                        </div>
-                        <div className="flex flex-col items-center gap-2">
-                          <div className={`w-10 h-10 rounded-full flex items-center justify-center transition-all ${step >= 2 ? 'bg-green-500 text-white shadow-lg shadow-green-100 scale-110' : 'bg-white border-2 border-gray-100 text-gray-300'}`}>
-                            <ChefHat size={18} />
-                          </div>
-                          <span className={`text-[10px] font-black uppercase tracking-tighter ${step >= 2 ? 'text-green-600' : 'text-gray-400'}`}>Preparing</span>
-                        </div>
-                        <div className="flex flex-col items-center gap-2">
-                          <div className={`w-10 h-10 rounded-full flex items-center justify-center transition-all ${step >= 3 ? 'bg-green-500 text-white shadow-lg shadow-green-100 scale-110' : 'bg-white border-2 border-gray-100 text-gray-300'}`}>
-                            <CheckCircle2 size={18} />
-                          </div>
-                          <span className={`text-[10px] font-black uppercase tracking-tighter ${step >= 3 ? 'text-green-600' : 'text-gray-400'}`}>Served</span>
-                        </div>
+                        ))}
                       </div>
                     </div>
                   </div>
 
-                  <div className="flex justify-between items-end border-b border-gray-50 pb-4">
+                  <div className="flex justify-between items-end border-b border-gray-100 pb-6">
                     <div>
-                      <p className="text-xs text-gray-400 font-bold uppercase tracking-widest mb-1">Table Number</p>
-                      <p className="text-lg font-black text-gray-900">Table {order.tableNumber}</p>
+                      <p className="text-[10px] text-gray-400 font-black uppercase tracking-widest mb-1.5">Your Table</p>
+                      <div className="flex items-center gap-2">
+                        <div className="w-8 h-8 bg-indigo-50 text-indigo-600 rounded-xl flex items-center justify-center font-black text-xs border border-indigo-100">
+                          <Hash size={12} strokeWidth={3} />
+                        </div>
+                        <p className="text-xl font-black text-gray-900 tracking-tighter">Table {order.tableNumber}</p>
+                      </div>
                     </div>
                     <div className="text-right">
-                      <p className="text-xs text-gray-400 font-bold uppercase tracking-widest mb-1">Total Amount</p>
-                      <p className="text-lg font-black text-indigo-600">₹{order.totalAmount?.toFixed(2)}</p>
+                      <p className="text-[10px] text-gray-400 font-black uppercase tracking-widest mb-1.5">Total Bill</p>
+                      <p className="text-2xl font-black text-transparent bg-clip-text bg-linear-to-r from-indigo-600 to-violet-700 tracking-tighter">₹{order.totalAmount?.toFixed(2)}</p>
                     </div>
                   </div>
 
-                  <div className="space-y-3">
-                    <h4 className="text-xs font-black text-gray-400 uppercase tracking-widest">Items Detail</h4>
-                    <div className="space-y-2">
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Order Details</h4>
+                      <div className="h-[1px] flex-1 ml-4 bg-gray-50" />
+                    </div>
+                    <div className="space-y-3">
                       {order.items?.map((item, i) => (
-                        <div key={i} className="flex justify-between text-sm">
-                          <span className="text-gray-700 font-medium">{item.name} <span className="text-gray-400">x{item.quantity}</span></span>
-                          <span className="font-bold text-gray-900">₹{(item.price * item.quantity).toFixed(2)}</span>
+                        <div key={i} className="flex justify-between text-sm group/item">
+                          <span className="text-gray-600 font-semibold group-hover:text-gray-900 transition-colors">
+                            {item.name} <span className="text-gray-300 font-black ml-1 uppercase text-[10px]">x{item.quantity}</span>
+                          </span>
+                          <span className="font-black text-gray-900 tracking-tight">₹{(item.price * item.quantity).toFixed(2)}</span>
                         </div>
                       ))}
                     </div>
                   </div>
 
                   {order.notes && (
-                    <div className="p-3 bg-gray-50 rounded-xl text-xs text-gray-500 italic border-l-4 border-indigo-200">
+                    <div className="relative p-5 bg-indigo-50/50 rounded-3xl text-sm text-indigo-900/70 font-medium italic border-l-4 border-indigo-400 overflow-hidden">
+                      <div className="absolute top-0 right-0 p-2 opacity-10">
+                        <Sparkles size={40} />
+                      </div>
                       "{order.notes}"
                     </div>
                   )}

@@ -1,16 +1,20 @@
 @import "tailwindcss";
 
 :root {
-  font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
+  --primary: #6366f1; /* indigo-600 */
+  --primary-glow: rgba(99, 102, 241, 0.2);
+  --accent: #f59e0b; /* amber-500 */
+  --surface: #ffffff;
+  --background: #f9fafb;
+  --text-main: #111827;
+  --text-muted: #6b7280;
+  
+  font-family: 'Outfit', 'Inter', system-ui, sans-serif;
   line-height: 1.5;
   font-weight: 400;
-
   color-scheme: light;
-  color: #1a1a1a;
-  background-color: #ffffff;
-
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
+  color: var(--text-main);
+  background-color: var(--background);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
@@ -19,7 +23,44 @@ body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
-  background-color: #f9fafb; /* gray-50 */
+  background-color: var(--background);
+  overflow-x: hidden;
+}
+
+/* Glassmorphism Utilities */
+.glass {
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(12px) saturate(180%);
+  -webkit-backdrop-filter: blur(12px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.glass-dark {
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(12px) saturate(180%);
+  -webkit-backdrop-filter: blur(12px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Animations */
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.animate-shimmer {
+  background: linear-gradient(90deg, #f3f4f6 25%, #e5e7eb 50%, #f3f4f6 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-5px); }
+}
+
+.animate-float {
+  animation: float 3s ease-in-out infinite;
 }
 
 /* Hide scrollbar for horizontal category list */
@@ -29,4 +70,9 @@ body {
 .scrollbar-hide {
   -ms-overflow-style: none;
   scrollbar-width: none;
+}
+
+/* Smooth Scrolling */
+html {
+  scroll-behavior: smooth;
 }

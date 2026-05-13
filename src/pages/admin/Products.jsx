@@ -12,7 +12,7 @@ import {
   serverTimestamp 
 } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { Plus, Edit2, Trash2, Image as ImageIcon, Search, Folder as FolderIcon } from 'lucide-react';
+import { Plus, Edit2, Trash2, Image as ImageIcon, Search, Folder as FolderIcon, Sparkles, Filter, MoreVertical, CheckCircle, XCircle } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import Button from '../../components/Button';
 import Input from '../../components/Input';
@@ -85,32 +85,36 @@ const Products = () => {
 
       if (editingProduct) {
         await updateDoc(doc(db, 'products', editingProduct.id), productData);
-        toast.success('Product updated successfully');
+        toast.success('Product refined successfully', {
+          style: { borderRadius: '1rem', background: '#333', color: '#fff' }
+        });
       } else {
         await addDoc(collection(db, 'products'), {
           ...productData,
           createdAt: serverTimestamp()
         });
-        toast.success('Product added successfully');
+        toast.success('New product launched!', {
+          style: { borderRadius: '1rem', background: '#333', color: '#fff' }
+        });
       }
 
       setIsModalOpen(false);
       resetForm();
     } catch (error) {
       console.error(error);
-      toast.error('Error saving product');
+      toast.error('Sync failed. Please check connection.');
     } finally {
       setLoading(false);
     }
   };
 
   const handleDelete = async (id) => {
-    if (window.confirm('Are you sure you want to delete this product?')) {
+    if (window.confirm('Are you sure you want to remove this item from the collection?')) {
       try {
         await deleteDoc(doc(db, 'products', id));
-        toast.success('Product deleted');
+        toast.success('Product archived');
       } catch (error) {
-        toast.error('Error deleting product');
+        toast.error('Delete operation failed');
       }
     }
   };
@@ -139,21 +143,21 @@ const Products = () => {
         createdAt: serverTimestamp()
       });
       setNewCategoryName('');
-      toast.success('Category added');
+      toast.success('Category established');
     } catch (error) {
-      toast.error('Error adding category');
+      toast.error('Category creation failed');
     }
   };
 
   const handleDeleteCategory = async (id) => {
     if (products.some(p => p.categoryId === id)) {
-      return toast.error('Cannot delete category with products');
+      return toast.error('Dependencies detected: Remove products first');
     }
     try {
       await deleteDoc(doc(db, 'categories', id));
-      toast.success('Category deleted');
+      toast.success('Category removed');
     } catch (error) {
-      toast.error('Error deleting category');
+      toast.error('Operation restricted');
     }
   };
 
@@ -177,91 +181,140 @@ const Products = () => {
   );
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-500">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+    <div className="space-y-10 animate-in fade-in slide-in-from-bottom-8 duration-1000 pb-20">
+      <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-8">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Products</h1>
-          <p className="text-gray-500">Manage your menu items and availability</p>
+          <div className="flex items-center gap-2 mb-2">
+            <Sparkles size={14} className="text-indigo-600 animate-pulse" />
+            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Inventory Control</span>
+          </div>
+          <h1 className="text-4xl font-black text-gray-900 tracking-tighter uppercase leading-none">Inventory</h1>
+          <p className="text-gray-500 mt-2 font-medium">Curate and manage your restaurant's culinary offerings.</p>
         </div>
-        <div className="flex gap-2">
-          <Button variant="secondary" onClick={() => setIsCategoryModalOpen(true)} className="flex items-center gap-2">
-            <FolderIcon size={20} />
-            Categories
+        <div className="flex flex-wrap gap-4">
+          <Button variant="secondary" onClick={() => setIsCategoryModalOpen(true)} className="flex items-center gap-2 px-6 py-4 rounded-2xl shadow-sm">
+            <FolderIcon size={20} className="text-gray-400" />
+            Manage Categories
           </Button>
-          <Button onClick={() => { resetForm(); setIsModalOpen(true); }} className="flex items-center gap-2">
+          <Button onClick={() => { resetForm(); setIsModalOpen(true); }} className="flex items-center gap-2 px-6 py-4 rounded-2xl shadow-lg shadow-indigo-200">
             <Plus size={20} />
-            Add New Product
+            Launch New Product
           </Button>
         </div>
       </div>
 
-      <div className="flex gap-4">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
+      <div className="flex flex-col md:flex-row gap-6">
+        <div className="relative flex-1 group">
+          <div className="absolute inset-y-0 left-0 pl-5 flex items-center pointer-events-none text-gray-400 group-focus-within:text-indigo-600 transition-colors">
+            <Search size={22} strokeWidth={2.5} />
+          </div>
           <input
             type="text"
-            placeholder="Search products..."
-            className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none"
+            placeholder="Search items by name or flavor profile..."
+            className="w-full pl-14 pr-6 py-5 bg-white border border-gray-100/50 rounded-3xl focus:ring-4 focus:ring-indigo-100 outline-none shadow-[0_8px_30px_rgb(0,0,0,0.04)] transition-all focus:shadow-[0_20px_40px_rgb(0,0,0,0.08)] placeholder:text-gray-400 placeholder:font-medium text-gray-900"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
+        <button className="p-5 bg-white border border-gray-100/50 rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] text-gray-400 hover:text-indigo-600 transition-all active:scale-95">
+          <Filter size={24} />
+        </button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8">
         {loading ? (
           Array(6).fill(0).map((_, i) => (
-            <div key={i} className="h-64 bg-gray-100 rounded-2xl animate-pulse" />
+            <div key={i} className="h-80 bg-gray-100 rounded-[2.5rem] animate-shimmer" />
           ))
         ) : filteredProducts.length === 0 ? (
-          <div className="col-span-full py-12 text-center text-gray-500 italic">
-            No products found. Click "Add New Product" to get started.
+          <div className="col-span-full py-32 text-center space-y-4 glass rounded-[3rem] border-dashed border-2 border-gray-100">
+            <div className="w-20 h-20 bg-gray-50 rounded-full flex items-center justify-center mx-auto text-gray-300">
+              <Package size={40} />
+            </div>
+            <p className="text-gray-400 font-bold uppercase tracking-widest text-xs">No culinary items found in the repository</p>
+            <Button variant="secondary" onClick={() => setSearchTerm('')}>Clear Search</Button>
           </div>
         ) : (
-          filteredProducts.map(product => (
-            <Card key={product.id} className="overflow-hidden group" padding="p-0">
-              <div className="aspect-video bg-gray-100 relative overflow-hidden">
+          filteredProducts.map((product, index) => (
+            <Card 
+              key={product.id} 
+              className="overflow-hidden group border-none shadow-[0_15px_40px_rgba(0,0,0,0.03)] hover:shadow-[0_30px_60px_rgba(0,0,0,0.08)] transition-all duration-700 rounded-[2.5rem] animate-in fade-in slide-in-from-bottom-8 fill-mode-both" 
+              padding="p-0"
+              style={{ animationDelay: `${index * 50}ms` }}
+            >
+              <div className="aspect-video bg-gray-50 relative overflow-hidden">
                 {product.imageUrl ? (
                   <img 
                     src={product.imageUrl} 
                     alt={product.name} 
-                    className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" 
+                    className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-110" 
                   />
                 ) : (
-                  <div className="w-full h-full flex items-center justify-center text-gray-300">
-                    <ImageIcon size={48} />
+                  <div className="w-full h-full flex items-center justify-center text-gray-200 bg-linear-to-br from-gray-50 to-gray-100">
+                    <ImageIcon size={56} strokeWidth={1} />
                   </div>
                 )}
-                <div className="absolute top-2 right-2 flex gap-2">
+                
+                <div className="absolute top-4 right-4 flex gap-2 translate-y-4 opacity-0 group-hover:translate-y-0 group-hover:opacity-100 transition-all duration-500">
                   <button 
                     onClick={() => openEditModal(product)}
-                    className="p-2 bg-white rounded-full shadow-lg text-gray-600 hover:text-indigo-600"
+                    className="p-3 bg-white/90 backdrop-blur-md rounded-2xl shadow-xl text-gray-900 hover:bg-indigo-600 hover:text-white transition-all active:scale-90"
                   >
-                    <Edit2 size={16} />
+                    <Edit2 size={18} strokeWidth={2.5} />
                   </button>
                   <button 
                     onClick={() => handleDelete(product.id)}
-                    className="p-2 bg-white rounded-full shadow-lg text-gray-600 hover:text-red-600"
+                    className="p-3 bg-white/90 backdrop-blur-md rounded-2xl shadow-xl text-gray-900 hover:bg-red-600 hover:text-white transition-all active:scale-90"
                   >
-                    <Trash2 size={16} />
+                    <Trash2 size={18} strokeWidth={2.5} />
                   </button>
                 </div>
-                <div className={`absolute bottom-2 left-2 px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider ${
-                  product.isAvailable ? 'bg-green-500 text-white' : 'bg-red-500 text-white'
+
+                <div className={`absolute bottom-4 left-4 px-4 py-2 rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-lg flex items-center gap-2 ${
+                  product.isAvailable ? 'bg-emerald-500 text-white shadow-emerald-200' : 'bg-rose-500 text-white shadow-rose-200'
                 }`}>
-                  {product.isAvailable ? 'Available' : 'Out of Stock'}
+                  <div className={`w-1.5 h-1.5 rounded-full bg-white ${product.isAvailable ? 'animate-pulse' : ''}`} />
+                  {product.isAvailable ? 'In Service' : 'Out of Stock'}
                 </div>
               </div>
-              <div className="p-4">
-                <div className="flex justify-between items-start mb-2">
-                  <h3 className="font-bold text-lg text-gray-900">{product.name}</h3>
-                  <span className="text-indigo-600 font-bold">₹{product.price}</span>
+
+              <div className="p-8">
+                <div className="flex justify-between items-start mb-4">
+                  <div>
+                    <h3 className="font-black text-xl text-gray-900 group-hover:text-indigo-600 transition-colors tracking-tight leading-none mb-1">{product.name}</h3>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
+                        {categories.find(c => c.id === product.categoryId)?.name || 'Uncategorized'}
+                      </span>
+                      {product.isVegetarian && (
+                        <div className="w-3 h-3 border border-green-600 flex items-center justify-center p-0.5">
+                          <div className="w-full h-full bg-green-600 rounded-full" />
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-2xl font-black text-indigo-600 tracking-tighter leading-none">₹{product.price}</p>
+                    <p className="text-[10px] text-gray-400 font-bold mt-1 uppercase">Unit Price</p>
+                  </div>
                 </div>
-                <p className="text-sm text-gray-500 line-clamp-2">{product.description}</p>
-                <div className="mt-4 flex items-center gap-2">
-                  <span className="text-[10px] px-2 py-1 bg-gray-100 rounded-full font-medium text-gray-600">
-                    {categories.find(c => c.id === product.categoryId)?.name || 'Uncategorized'}
-                  </span>
+                <p className="text-sm text-gray-500 line-clamp-2 font-medium leading-relaxed">{product.description}</p>
+                
+                <div className="mt-8 pt-6 border-t border-gray-50 flex items-center justify-between">
+                  <div className="flex items-center gap-4">
+                    <div className="flex flex-col">
+                      <span className="text-[9px] text-gray-400 font-black uppercase tracking-widest mb-1">Time</span>
+                      <span className="text-xs font-black text-gray-900">{product.cookingTime}m</span>
+                    </div>
+                    <div className="w-[1px] h-6 bg-gray-100" />
+                    <div className="flex flex-col">
+                      <span className="text-[9px] text-gray-400 font-black uppercase tracking-widest mb-1">Tax Rate</span>
+                      <span className="text-xs font-black text-gray-900">{product.gstPercent}%</span>
+                    </div>
+                  </div>
+                  <button className="text-gray-400 hover:text-indigo-600 transition-colors">
+                    <MoreVertical size={20} />
+                  </button>
                 </div>
               </div>
             </Card>
@@ -273,49 +326,51 @@ const Products = () => {
       <Modal 
         isOpen={isModalOpen} 
         onClose={() => setIsModalOpen(false)}
-        title={editingProduct ? 'Edit Product' : 'Add New Product'}
+        title={editingProduct ? 'Refine Product' : 'Launch New Product'}
         footer={
-          <div className="flex gap-3">
-            <Button variant="secondary" onClick={() => setIsModalOpen(false)}>Cancel</Button>
-            <Button onClick={handleSubmit} disabled={loading}>
-              {loading ? 'Saving...' : editingProduct ? 'Update Product' : 'Add Product'}
+          <div className="flex gap-4 w-full">
+            <Button variant="secondary" onClick={() => setIsModalOpen(false)} className="flex-1 py-4 rounded-2xl">Cancel</Button>
+            <Button onClick={handleSubmit} disabled={loading} className="flex-2 py-4 rounded-2xl shadow-lg shadow-indigo-200">
+              {loading ? 'Processing...' : editingProduct ? 'Sync Changes' : 'Confirm Launch'}
             </Button>
           </div>
         }
       >
-        <form className="space-y-4">
+        <form className="space-y-6 py-2">
           <Input 
-            label="Product Name" 
+            label="Product Title" 
             name="name" 
             value={formData.name} 
             onChange={handleInputChange} 
-            placeholder="e.g. Butter Chicken"
+            placeholder="e.g. Artisanal Truffle Pasta"
+            className="font-bold"
           />
-          <div className="flex flex-col gap-1">
-            <label className="text-sm font-medium text-gray-700">Description</label>
+          <div className="flex flex-col gap-2">
+            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Flavor Description</label>
             <textarea 
               name="description" 
               value={formData.description} 
               onChange={handleInputChange}
-              className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none h-24"
-              placeholder="Tell us about the dish..."
+              className="px-5 py-4 bg-gray-50 border border-transparent rounded-[1.5rem] focus:bg-white focus:border-indigo-100 focus:ring-4 focus:ring-indigo-50 outline-none h-32 transition-all resize-none text-sm font-medium"
+              placeholder="Describe the textures, aromas, and ingredients..."
             />
           </div>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-2 gap-6">
             <Input 
               label="Price (₹)" 
               name="price" 
               type="number" 
               value={formData.price} 
               onChange={handleInputChange}
+              placeholder="0.00"
             />
-            <div className="flex flex-col gap-1">
-              <label className="text-sm font-medium text-gray-700">Category</label>
+            <div className="flex flex-col gap-2">
+              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Culinary Category</label>
               <select 
                 name="categoryId" 
                 value={formData.categoryId} 
                 onChange={handleInputChange}
-                className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none bg-white"
+                className="px-5 py-4 bg-gray-50 border border-transparent rounded-[1.5rem] focus:bg-white focus:border-indigo-100 focus:ring-4 focus:ring-indigo-50 outline-none bg-[image:none] transition-all text-sm font-black appearance-none"
               >
                 <option value="">Select Category</option>
                 {categories.map(cat => (
@@ -324,24 +379,17 @@ const Products = () => {
               </select>
             </div>
           </div>
-          <Input 
-            label="Cooking Time (mins)" 
-            name="cookingTime" 
-            type="number" 
-            value={formData.cookingTime} 
-            onChange={handleInputChange} 
-            placeholder="15"
-          />
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-2 gap-6">
             <Input 
-              label="Product Image URL" 
-              name="imageUrl" 
-              value={formData.imageUrl} 
+              label="Preparation Time (min)" 
+              name="cookingTime" 
+              type="number" 
+              value={formData.cookingTime} 
               onChange={handleInputChange} 
-              placeholder="https://images.unsplash.com/..."
+              placeholder="15"
             />
             <Input 
-              label="GST %" 
+              label="GST Taxation (%)" 
               name="gstPercent" 
               type="number" 
               value={formData.gstPercent} 
@@ -349,16 +397,35 @@ const Products = () => {
               placeholder="5"
             />
           </div>
-          <div className="flex items-center gap-2 py-2">
-            <input 
-              type="checkbox" 
-              id="isAvailable" 
-              name="isAvailable" 
-              checked={formData.isAvailable} 
-              onChange={handleInputChange}
-              className="w-4 h-4 text-indigo-600 rounded"
-            />
-            <label htmlFor="isAvailable" className="text-sm font-medium text-gray-700">Available for Order</label>
+          <Input 
+            label="High-Res Image URL" 
+            name="imageUrl" 
+            value={formData.imageUrl} 
+            onChange={handleInputChange} 
+            placeholder="https://images.unsplash.com/your-dish-url"
+          />
+          <div className="flex items-center gap-4 p-5 bg-indigo-50/50 rounded-3xl border border-indigo-100/50">
+            <div className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-colors ${formData.isAvailable ? 'bg-emerald-100 text-emerald-600' : 'bg-rose-100 text-rose-600'}`}>
+              {formData.isAvailable ? <CheckCircle size={24} /> : <XCircle size={24} />}
+            </div>
+            <div className="flex-1">
+              <p className="text-xs font-black text-gray-900 uppercase tracking-tight">Active Availability</p>
+              <p className="text-[10px] text-gray-500 font-medium">Enable this to allow guests to order this item immediately.</p>
+            </div>
+            <div className="relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none bg-gray-200">
+              <input 
+                type="checkbox" 
+                id="isAvailable" 
+                name="isAvailable" 
+                checked={formData.isAvailable} 
+                onChange={handleInputChange}
+                className="sr-only"
+              />
+              <label 
+                htmlFor="isAvailable"
+                className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out ${formData.isAvailable ? 'translate-x-5' : 'translate-x-0'}`}
+              />
+            </div>
           </div>
         </form>
       </Modal>
@@ -367,34 +434,49 @@ const Products = () => {
       <Modal
         isOpen={isCategoryModalOpen}
         onClose={() => setIsCategoryModalOpen(false)}
-        title="Manage Categories"
+        title="Category Architecture"
       >
-        <div className="space-y-6">
-          <form onSubmit={handleAddCategory} className="flex gap-2">
+        <div className="space-y-8 py-2">
+          <form onSubmit={handleAddCategory} className="flex gap-4">
             <Input 
-              placeholder="New Category Name" 
+              placeholder="e.g. Signature Mains" 
               value={newCategoryName}
               onChange={(e) => setNewCategoryName(e.target.value)}
               className="flex-1"
             />
-            <Button type="submit">Add</Button>
+            <Button type="submit" className="px-8 rounded-2xl shadow-lg shadow-indigo-100">Establish</Button>
           </form>
 
-          <div className="space-y-2">
-            {categories.map(cat => (
-              <div key={cat.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
-                <span className="font-medium text-gray-700">{cat.name}</span>
-                <button 
-                  onClick={() => handleDeleteCategory(cat.id)}
-                  className="p-2 text-gray-400 hover:text-red-600 transition-colors"
+          <div className="space-y-3">
+            <div className="flex items-center justify-between mb-4">
+              <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Existing Categories</span>
+              <div className="h-[1px] flex-1 ml-4 bg-gray-100" />
+            </div>
+            <div className="grid grid-cols-1 gap-3">
+              {categories.map((cat, index) => (
+                <div 
+                  key={cat.id} 
+                  className="flex items-center justify-between p-4 bg-white border border-gray-100 rounded-[1.5rem] hover:shadow-xl hover:shadow-gray-100 transition-all duration-300 animate-in fade-in slide-in-from-right-4 fill-mode-both"
+                  style={{ animationDelay: `${index * 50}ms` }}
                 >
-                  <Trash2 size={18} />
-                </button>
-              </div>
-            ))}
-            {categories.length === 0 && (
-              <p className="text-center text-gray-500 italic text-sm">No categories yet.</p>
-            )}
+                  <div className="flex items-center gap-3">
+                    <div className="w-2 h-2 bg-indigo-600 rounded-full" />
+                    <span className="font-black text-gray-900 tracking-tight uppercase text-xs">{cat.name}</span>
+                  </div>
+                  <button 
+                    onClick={() => handleDeleteCategory(cat.id)}
+                    className="p-2 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all active:scale-90"
+                  >
+                    <Trash2 size={18} />
+                  </button>
+                </div>
+              ))}
+              {categories.length === 0 && (
+                <div className="text-center py-10 glass rounded-[2rem] border-dashed border-2 border-gray-100">
+                  <p className="text-gray-400 font-bold uppercase tracking-widest text-[10px]">No categories established yet</p>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </Modal>
