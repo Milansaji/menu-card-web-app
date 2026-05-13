@@ -1,12 +1,13 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { db } from '../../firebase/firebase';
-import { collection, onSnapshot, query, orderBy, doc, updateDoc } from 'firebase/firestore';
-import { FileText, Calendar, User, IndianRupee, ExternalLink, Hash, X, ShoppingBag, CheckCircle2, Search, Filter, ChefHat, Truck } from 'lucide-react';
+import { collection, onSnapshot, query, orderBy, doc, updateDoc, getDoc } from 'firebase/firestore';
+import { FileText, Calendar, IndianRupee, ExternalLink, Hash, ShoppingBag, CheckCircle2, Search, Filter, ChefHat } from 'lucide-react';
 import Card from '../../components/Card';
 import Modal from '../../components/Modal';
 import Button from '../../components/Button';
 import { format, isToday, isYesterday } from 'date-fns';
 import { toast } from 'react-hot-toast';
+import { playSound } from '../../utils/audio';
 
 const Orders = () => {
   const [orders, setOrders] = useState([]);
@@ -22,25 +23,69 @@ const Orders = () => {
     pendingOrders: 0,
     todayCount: 0
   });
-
-  const prevOrdersCount = React.useRef(0);
+  const [currentSound, setCurrentSound] = useState('bell');
 
   useEffect(() => {
-    const q = query(collection(db, 'bills'), orderBy('date', 'desc'));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const newOrders = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      setOrders(newOrders);
-      setLoading(false);
+    const fetchSettings = async () => {
+      const docSnap = await getDoc(doc(db, 'settings', 'config'));
+      if (docSnap.exists()) {
+        setCurrentSound(docSnap.data().notificationSound || 'bell');
+      }
+    };
+    fetchSettings();
+  }, []);
 
-      // Sound notification logic
+  const prevOrdersCount = useRef(0);
       if (newOrders.length > prevOrdersCount.current && prevOrdersCount.current !== 0) {
-        const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
-        audio.play().catch(e => console.log('Audio play blocked'));
-        toast('New Order Received!', { icon: '🔔', position: 'top-right' });
+        const latest = newOrders[0];
+        
+        // Use professional synthesized sound utility
+        playSound(currentSound);
+        
+        const originalTitle = document.title;
+        let isBlinking = true;
+        const blinkInterval = setInterval(() => {
+          document.title = isBlinking ? '🚨 NEW ORDER! 🚨' : originalTitle;
+          isBlinking = !isBlinking;
+        }, 1000);
+        
+        setTimeout(() => {
+          clearInterval(blinkInterval);
+          document.title = originalTitle;
+        }, 10000);
+        
+        toast.custom((t) => (
+          <div className={`${t.visible ? 'animate-in slide-in-from-top-full' : 'animate-out fade-out'} max-w-md w-full bg-slate-900 shadow-2xl rounded-3xl pointer-events-auto flex ring-1 ring-black ring-opacity-5 p-4 border-2 border-indigo-500`}>
+            <div className="flex-1 w-0 p-1">
+              <div className="flex items-start">
+                <div className="flex-shrink-0 pt-0.5">
+                  <div className="h-12 w-12 rounded-2xl bg-indigo-500 flex items-center justify-center text-white shadow-lg shadow-indigo-500/50">
+                    <ChefHat size={24} />
+                  </div>
+                </div>
+                <div className="ml-4 flex-1">
+                  <p className="text-xs font-black text-indigo-400 uppercase tracking-[0.2em] mb-1">New Order Incoming</p>
+                  <p className="text-xl font-black text-white">Table {latest.tableNumber}</p>
+                  <p className="mt-1 text-sm font-bold text-slate-400">Order ID: #{latest.invoiceNumber}</p>
+                </div>
+              </div>
+            </div>
+            <div className="flex border-l border-slate-800 ml-4 pl-4">
+              <button
+                onClick={() => {
+                  toast.dismiss(t.id);
+                  openOrderDetails(latest);
+                }}
+                className="w-full border border-transparent rounded-none rounded-r-lg flex items-center justify-center text-sm font-black text-indigo-400 hover:text-indigo-300 focus:outline-none"
+              >
+                VIEW
+              </button>
+            </div>
+          </div>
+        ), { duration: 15000, position: 'top-center' });
       }
       prevOrdersCount.current = newOrders.length;
 
-      // Calculate Stats
       const today = newOrders.filter(o => o.date?.toDate && isToday(o.date.toDate()));
       setStats({
         todaySales: today.reduce((acc, o) => acc + (o.totalAmount || 0), 0),
@@ -74,7 +119,6 @@ const Orders = () => {
     try {
       await updateDoc(doc(db, 'bills', id), { deliveryStatus: newStatus });
       toast.success(`Status updated to ${newStatus}`);
-      // Update selectedOrder state to reflect changes in modal
       setSelectedOrder(prev => ({ ...prev, deliveryStatus: newStatus }));
     } catch (error) {
       toast.error('Failed to update delivery status');
@@ -115,6 +159,17 @@ const Orders = () => {
           <p className="text-gray-500 mt-1">Real-time monitoring of kitchen and payments.</p>
         </div>
         <div className="flex gap-3">
+          <button 
+            onClick={() => {
+              playSound(currentSound);
+              toast.success('Sound test successful!', { icon: '🔊' });
+            }}
+            className="bg-white text-gray-600 p-3 rounded-2xl border border-gray-100 shadow-sm hover:bg-gray-50 transition-colors flex items-center gap-2 group"
+            title="Test Notification Sound"
+          >
+            <ChefHat size={20} className="group-hover:rotate-12 transition-transform" />
+            <span className="text-xs font-bold">Test Sound</span>
+          </button>
           <div className="bg-indigo-600 text-white p-3 rounded-2xl shadow-lg shadow-indigo-100 flex items-center gap-3">
             <IndianRupee size={24} />
             <div>

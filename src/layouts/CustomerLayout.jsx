@@ -3,19 +3,39 @@ import { Outlet, Link } from 'react-router-dom';
 import { useCart } from '../contexts/CartContext';
 import { ShoppingCart, Menu as MenuIcon, Receipt, Hash } from 'lucide-react';
 
+import { doc, getDoc } from 'firebase/firestore';
+import { db } from '../firebase/firebase';
+
 const CustomerLayout = () => {
   const { totalItems, tableNumber } = useCart();
+  const [logo, setLogo] = React.useState(null);
+  const [hotelName, setHotelName] = React.useState('FoodieMenu');
+
+  React.useEffect(() => {
+    const fetchLogo = async () => {
+      const docSnap = await getDoc(doc(db, 'settings', 'config'));
+      if (docSnap.exists()) {
+        setLogo(docSnap.data().logoUrl);
+        setHotelName(docSnap.data().restaurantName || 'FoodieMenu');
+      }
+    };
+    fetchLogo();
+  }, []);
 
   return (
     <div className="min-h-screen bg-white flex flex-col">
       {/* Header */}
       <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-gray-100 px-4 py-3 flex items-center justify-between">
         <Link to="/menu/main" className="flex items-center gap-2">
-          <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center">
-            <MenuIcon className="text-white" size={18} />
-          </div>
+          {logo ? (
+            <img src={logo} alt={hotelName} className="w-10 h-10 rounded-xl object-cover shadow-sm border border-gray-100" />
+          ) : (
+            <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center shadow-lg shadow-indigo-100">
+              <MenuIcon className="text-white" size={20} />
+            </div>
+          )}
           <div className="flex flex-col">
-            <span className="font-bold text-sm text-gray-900 leading-tight">FoodieMenu</span>
+            <span className="font-black text-sm text-gray-900 leading-tight tracking-tight uppercase">{hotelName}</span>
             {tableNumber && (
               <span className="text-[10px] font-black text-indigo-600 flex items-center gap-0.5">
                 <Hash size={10} />

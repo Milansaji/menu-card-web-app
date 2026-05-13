@@ -5,17 +5,20 @@ import { toast } from 'react-hot-toast';
 import Button from '../../components/Button';
 import Input from '../../components/Input';
 import Card from '../../components/Card';
-import { Save, Building2, Receipt } from 'lucide-react';
+import { Save, Building2, Receipt, Volume2, CheckCircle2, Play } from 'lucide-react';
+import { playSound } from '../../utils/audio';
 
 const Settings = () => {
   const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(true);
   const [settings, setSettings] = useState({
     restaurantName: '',
+    logoUrl: '',
     address: '',
     phone: '',
     gstin: '',
-    gstMode: 'exclusive' // 'inclusive' or 'exclusive'
+    gstMode: 'exclusive', // 'inclusive' or 'exclusive'
+    notificationSound: 'bell' // 'bell', 'siren', 'digital', 'chime'
   });
 
   useEffect(() => {
@@ -81,6 +84,13 @@ const Settings = () => {
               onChange={handleChange}
               placeholder="e.g. Spice Route"
               required
+            />
+            <Input
+              label="Hotel Logo URL"
+              name="logoUrl"
+              value={settings.logoUrl}
+              onChange={handleChange}
+              placeholder="https://example.com/logo.png"
             />
             <Input
               label="Phone Number"
@@ -152,6 +162,57 @@ const Settings = () => {
                   : 'Base Price = Total / (1 + GST%)'}
               </p>
             </div>
+          </div>
+        </Card>
+
+        {/* Notification Audio */}
+        <Card className="space-y-6">
+          <div className="flex items-center gap-2 pb-4 border-b border-gray-100">
+            <Volume2 className="text-indigo-600" size={24} />
+            <h2 className="text-xl font-bold">Notification Audio</h2>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            {[
+              { id: 'bell', name: 'Kitchen Bell', icon: '🔔' },
+              { id: 'siren', name: 'Emergency Siren', icon: '🚨' },
+              { id: 'digital', name: 'Digital Ping', icon: '📱' },
+              { id: 'chime', name: 'Modern Chime', icon: '🎵' }
+            ].map((sound) => (
+              <div
+                key={sound.id}
+                onClick={() => setSettings(prev => ({ ...prev, notificationSound: sound.id }))}
+                className={`p-6 rounded-3xl border-2 transition-all flex flex-col items-center gap-3 relative cursor-pointer group ${
+                  settings.notificationSound === sound.id
+                    ? 'border-indigo-600 bg-indigo-50 shadow-xl shadow-indigo-100 ring-4 ring-indigo-50'
+                    : 'border-gray-100 bg-white hover:border-indigo-300'
+                }`}
+              >
+                <span className="text-3xl">{sound.icon}</span>
+                <span className={`text-xs font-black uppercase tracking-wider ${
+                  settings.notificationSound === sound.id ? 'text-indigo-600' : 'text-gray-400'
+                }`}>
+                  {sound.name}
+                </span>
+                {settings.notificationSound === sound.id && (
+                  <div className="absolute top-2 right-2 w-5 h-5 bg-indigo-600 text-white rounded-full flex items-center justify-center animate-in zoom-in duration-300">
+                    <CheckCircle2 size={12} />
+                  </div>
+                )}
+                
+                {/* Preview Button */}
+                <button 
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    playSound(sound.id);
+                  }}
+                  className="mt-4 px-4 py-2 bg-indigo-100 text-indigo-600 rounded-full text-xs font-black hover:bg-indigo-600 hover:text-white transition-all flex items-center gap-2 shadow-sm active:scale-95"
+                >
+                  <Play size={12} fill="currentColor" /> 
+                  PLAY PREVIEW
+                </button>
+              </div>
+            ))}
           </div>
         </Card>
 
