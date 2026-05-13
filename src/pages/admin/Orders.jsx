@@ -25,7 +25,7 @@ const Orders = () => {
   });
   const [currentSound, setCurrentSound] = useState('bell');
 
-  const [isKitchenActive, setIsKitchenActive] = useState(false);
+  const [isKitchenActive, setIsKitchenActive] = useState(true);
   const blinkRef = useRef(null);
   const timeoutRef = useRef(null);
 
@@ -44,15 +44,6 @@ const Orders = () => {
     };
     fetchSettings();
   }, []);
-
-  const startKitchenSession = () => {
-    playSound(currentSound);
-    setIsKitchenActive(true);
-    toast.success('Command Center Online', { 
-      icon: '🧑‍🍳',
-      style: { borderRadius: '1rem', background: '#333', color: '#fff' }
-    });
-  };
 
   useEffect(() => {
     const q = query(collection(db, 'bills'), orderBy('date', 'desc'));
@@ -199,48 +190,15 @@ const Orders = () => {
       <header className="flex flex-col lg:flex-row lg:items-end justify-between gap-8">
         <div>
           <div className="flex items-center gap-2 mb-2">
-            <div className={`w-2 h-2 rounded-full ${isKitchenActive ? 'bg-green-500 animate-pulse' : 'bg-gray-300'}`} />
-            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
-              {isKitchenActive ? 'Session Active' : 'Session Offline'}
+            <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+            <span className="text-[10px] font-black text-emerald-600 uppercase tracking-widest">
+              Kitchen Intelligence Active
             </span>
           </div>
           <h1 className="text-4xl font-black text-gray-900 tracking-tighter uppercase leading-none">Command Center</h1>
           <p className="text-gray-500 mt-2 font-medium">Real-time management of your restaurant's culinary flow.</p>
         </div>
         <div className="flex flex-wrap items-center gap-4">
-          {/* Sound Preview & Selector */}
-          <div className="flex items-center gap-2 bg-white border border-gray-100 p-2 rounded-2xl shadow-sm">
-            <select 
-              value={currentSound}
-              onChange={(e) => handleSoundChange(e.target.value)}
-              className="pl-4 pr-8 py-2 text-[10px] font-black uppercase tracking-widest text-gray-600 bg-transparent border-none outline-none cursor-pointer"
-            >
-              <option value="bell">🔔 Classic Bell</option>
-              <option value="chime">✨ Modern Chime</option>
-              <option value="digital">📟 Digital Beep</option>
-              <option value="siren">🚨 High Alert</option>
-            </select>
-            <button 
-              onClick={() => playSound(currentSound)}
-              className="p-2 hover:bg-indigo-50 text-indigo-600 rounded-xl transition-colors active:scale-90"
-              title="Test Sound"
-            >
-              <Volume2 size={18} strokeWidth={2.5} />
-            </button>
-          </div>
-
-          <button 
-            onClick={startKitchenSession}
-            disabled={isKitchenActive}
-            className={`px-6 py-4 rounded-2xl border transition-all flex items-center gap-3 group active:scale-95 shadow-sm font-black text-xs uppercase tracking-widest ${
-              isKitchenActive 
-                ? 'bg-emerald-50 border-emerald-200 text-emerald-600' 
-                : 'bg-white border-gray-100 text-gray-600 hover:bg-gray-50'
-            }`}
-          >
-            <ChefHat size={20} className={isKitchenActive ? 'animate-bounce' : 'group-hover:rotate-12 transition-transform'} />
-            {isKitchenActive ? 'Active Alerts' : 'Start Kitchen Alerts'}
-          </button>
           <div className="bg-linear-to-r from-indigo-600 to-violet-700 text-white px-6 py-4 rounded-2xl shadow-xl shadow-indigo-600/20 flex items-center gap-4">
             <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
               <TrendingUp size={22} />
