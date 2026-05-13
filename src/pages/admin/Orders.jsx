@@ -208,6 +208,27 @@ const Orders = () => {
           <p className="text-gray-500 mt-2 font-medium">Real-time management of your restaurant's culinary flow.</p>
         </div>
         <div className="flex flex-wrap items-center gap-4">
+          {/* Sound Preview & Selector */}
+          <div className="flex items-center gap-2 bg-white border border-gray-100 p-2 rounded-2xl shadow-sm">
+            <select 
+              value={currentSound}
+              onChange={(e) => handleSoundChange(e.target.value)}
+              className="pl-4 pr-8 py-2 text-[10px] font-black uppercase tracking-widest text-gray-600 bg-transparent border-none outline-none cursor-pointer"
+            >
+              <option value="bell">🔔 Classic Bell</option>
+              <option value="chime">✨ Modern Chime</option>
+              <option value="digital">📟 Digital Beep</option>
+              <option value="siren">🚨 High Alert</option>
+            </select>
+            <button 
+              onClick={() => playSound(currentSound)}
+              className="p-2 hover:bg-indigo-50 text-indigo-600 rounded-xl transition-colors active:scale-90"
+              title="Test Sound"
+            >
+              <Volume2 size={18} strokeWidth={2.5} />
+            </button>
+          </div>
+
           <button 
             onClick={startKitchenSession}
             disabled={isKitchenActive}
