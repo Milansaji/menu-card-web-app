@@ -193,6 +193,18 @@ const Settings = () => {
                 }`}>
                   {sound.name}
                 </span>
+                
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    playSound(sound.id);
+                  }}
+                  className="mt-2 p-2 bg-indigo-600 text-white rounded-full hover:bg-indigo-700 transition-all active:scale-90 shadow-lg shadow-indigo-100"
+                >
+                  <Play size={12} fill="currentColor" />
+                </button>
+
                 {settings.notificationSound === sound.id && (
                   <div className="absolute top-2 right-2 w-5 h-5 bg-indigo-600 text-white rounded-full flex items-center justify-center animate-in zoom-in duration-300">
                     <CheckCircle2 size={12} />
