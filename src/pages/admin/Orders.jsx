@@ -1,13 +1,12 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { db } from '../../firebase/firebase';
-import { collection, onSnapshot, query, orderBy, doc, updateDoc, getDoc } from 'firebase/firestore';
-import { FileText, Calendar, IndianRupee, ExternalLink, Hash, ShoppingBag, CheckCircle2, Search, Filter, ChefHat, Sparkles, TrendingUp, Clock, AlertCircle, Volume2 } from 'lucide-react';
+import { collection, onSnapshot, query, orderBy, doc, updateDoc } from 'firebase/firestore';
+import { FileText, Calendar, IndianRupee, ExternalLink, Hash, ShoppingBag, CheckCircle2, Search, Filter, ChefHat, Sparkles, TrendingUp, Clock, AlertCircle } from 'lucide-react';
 import Card from '../../components/Card';
 import Modal from '../../components/Modal';
 import Button from '../../components/Button';
 import { format, isToday, isYesterday } from 'date-fns';
 import { toast } from 'react-hot-toast';
-import { playSound } from '../../utils/audio';
 
 const Orders = () => {
   const [orders, setOrders] = useState([]);
@@ -23,27 +22,6 @@ const Orders = () => {
     pendingOrders: 0,
     todayCount: 0
   });
-  const [currentSound, setCurrentSound] = useState('bell');
-
-  const [isKitchenActive, setIsKitchenActive] = useState(true);
-  const blinkRef = useRef(null);
-  const timeoutRef = useRef(null);
-
-  const prevOrdersCount = useRef(0);
-
-  useEffect(() => {
-    const fetchSettings = async () => {
-      try {
-        const docSnap = await getDoc(doc(db, 'settings', 'config'));
-        if (docSnap.exists()) {
-          setCurrentSound(docSnap.data().notificationSound || 'bell');
-        }
-      } catch (err) {
-        console.error("Error fetching sound settings:", err);
-      }
-    };
-    fetchSettings();
-  }, []);
 
   useEffect(() => {
     const q = query(collection(db, 'bills'), orderBy('date', 'desc'));
@@ -65,8 +43,6 @@ const Orders = () => {
   const openOrderDetails = (order) => {
     setSelectedOrder(order);
     setIsModalOpen(true);
-  };
-
   };
 
   const updateOrderStatus = async (id, newStatus) => {
@@ -107,7 +83,6 @@ const Orders = () => {
     } else if (dateFilter === 'yesterday') {
       matchesDate = order.date?.toDate && isYesterday(order.date.toDate());
     }
-
     return matchesSearch && matchesStatus && matchesDate;
   });
 

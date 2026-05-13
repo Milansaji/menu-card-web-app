@@ -1,5 +1,5 @@
 import { onAuthStateChanged, signInWithEmailAndPassword, signOut } from 'firebase/auth';
-import { doc, getDoc, collection, query, onSnapshot, orderBy, limit } from 'firebase/firestore';
+import { doc, getDoc, collection, query, onSnapshot, orderBy, limit, where } from 'firebase/firestore';
 import { playSound } from '../utils/audio';
 import { toast } from 'react-hot-toast';
 import { ChefHat } from 'lucide-react';
