@@ -25,23 +25,35 @@ const Orders = () => {
   });
   const [currentSound, setCurrentSound] = useState('bell');
 
+  const prevOrdersCount = useRef(0);
+
+  // Fetch sound settings
   useEffect(() => {
     const fetchSettings = async () => {
-      const docSnap = await getDoc(doc(db, 'settings', 'config'));
-      if (docSnap.exists()) {
-        setCurrentSound(docSnap.data().notificationSound || 'bell');
+      try {
+        const docSnap = await getDoc(doc(db, 'settings', 'config'));
+        if (docSnap.exists()) {
+          setCurrentSound(docSnap.data().notificationSound || 'bell');
+        }
+      } catch (err) {
+        console.error("Error fetching sound settings:", err);
       }
     };
     fetchSettings();
   }, []);
 
-  const prevOrdersCount = useRef(0);
+  // Main real-time listener
+  useEffect(() => {
+    const q = query(collection(db, 'bills'), orderBy('date', 'desc'));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const newOrders = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      
+      // Notification Logic
       if (newOrders.length > prevOrdersCount.current && prevOrdersCount.current !== 0) {
         const latest = newOrders[0];
-        
-        // Use professional synthesized sound utility
         playSound(currentSound);
         
+        // Blink Title
         const originalTitle = document.title;
         let isBlinking = true;
         const blinkInterval = setInterval(() => {
@@ -54,6 +66,7 @@ const Orders = () => {
           document.title = originalTitle;
         }, 10000);
         
+        // Custom Toast
         toast.custom((t) => (
           <div className={`${t.visible ? 'animate-in slide-in-from-top-full' : 'animate-out fade-out'} max-w-md w-full bg-slate-900 shadow-2xl rounded-3xl pointer-events-auto flex ring-1 ring-black ring-opacity-5 p-4 border-2 border-indigo-500`}>
             <div className="flex-1 w-0 p-1">
@@ -84,8 +97,12 @@ const Orders = () => {
           </div>
         ), { duration: 15000, position: 'top-center' });
       }
+
+      setOrders(newOrders);
+      setLoading(false);
       prevOrdersCount.current = newOrders.length;
 
+      // Stats
       const today = newOrders.filter(o => o.date?.toDate && isToday(o.date.toDate()));
       setStats({
         todaySales: today.reduce((acc, o) => acc + (o.totalAmount || 0), 0),
@@ -94,7 +111,7 @@ const Orders = () => {
       });
     });
     return () => unsubscribe();
-  }, []);
+  }, [currentSound]);
 
   const openOrderDetails = (order) => {
     setSelectedOrder(order);
