@@ -22,6 +22,7 @@ import QRGenerator from './pages/admin/QRGenerator';
 import DigitalMenu from './pages/customer/DigitalMenu';
 import Cart from './pages/customer/Cart';
 import Checkout from './pages/customer/Checkout';
+import TrackOrder from './pages/customer/TrackOrder';
 
 // Protected Route Component
 const PrivateRoute = ({ children }) => {
@@ -41,6 +42,7 @@ function App() {
               <Route path="/menu/:restaurantId" element={<DigitalMenu />} />
               <Route path="/cart" element={<Cart />} />
               <Route path="/checkout" element={<Checkout />} />
+              <Route path="/track-order" element={<TrackOrder />} />
             </Route>
 
             {/* Auth Routes */}

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../../firebase/firebase';
 import { collection, onSnapshot, query, orderBy, doc, updateDoc } from 'firebase/firestore';
-import { FileText, Calendar, User, IndianRupee, ExternalLink, Hash, X, ShoppingBag, CheckCircle2, Search, Filter } from 'lucide-react';
+import { FileText, Calendar, User, IndianRupee, ExternalLink, Hash, X, ShoppingBag, CheckCircle2, Search, Filter, ChefHat, Truck } from 'lucide-react';
 import Card from '../../components/Card';
 import Modal from '../../components/Modal';
 import Button from '../../components/Button';
@@ -16,7 +16,7 @@ const Orders = () => {
   
   // Filter states
   const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState('all');
+  const [statusFilter, setStatusFilter] = useState('pending');
   const [dateFilter, setDateFilter] = useState('all');
 
   useEffect(() => {
@@ -35,11 +35,26 @@ const Orders = () => {
 
   const updateOrderStatus = async (id, newStatus) => {
     try {
-      await updateDoc(doc(db, 'bills', id), { status: newStatus });
+      const updates = { status: newStatus };
+      if (newStatus === 'paid') {
+        updates.deliveryStatus = 'Served';
+      }
+      await updateDoc(doc(db, 'bills', id), updates);
       toast.success(`Order marked as ${newStatus}`);
       setIsModalOpen(false);
     } catch (error) {
       toast.error('Failed to update status');
+    }
+  };
+
+  const updateDeliveryStatus = async (id, newStatus) => {
+    try {
+      await updateDoc(doc(db, 'bills', id), { deliveryStatus: newStatus });
+      toast.success(`Status updated to ${newStatus}`);
+      // Update selectedOrder state to reflect changes in modal
+      setSelectedOrder(prev => ({ ...prev, deliveryStatus: newStatus }));
+    } catch (error) {
+      toast.error('Failed to update delivery status');
     }
   };
 
@@ -49,7 +64,6 @@ const Orders = () => {
     const tableMatch = String(order.tableNumber || '').toLowerCase().includes(searchLower);
     
     const matchesSearch = invoiceMatch || tableMatch;
-    
     const matchesStatus = statusFilter === 'all' || order.status === statusFilter;
     
     let matchesDate = true;
@@ -61,6 +75,14 @@ const Orders = () => {
 
     return matchesSearch && matchesStatus && matchesDate;
   });
+
+  const getDeliveryStatusColor = (status) => {
+    switch (status) {
+      case 'Preparing': return 'bg-orange-100 text-orange-600';
+      case 'Served': return 'bg-blue-100 text-blue-600';
+      default: return 'bg-gray-100 text-gray-600';
+    }
+  };
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
@@ -105,9 +127,9 @@ const Orders = () => {
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
             >
-              <option value="all">All Status</option>
-              <option value="pending">Pending</option>
-              <option value="paid">Paid</option>
+              <option value="pending">Active Orders</option>
+              <option value="paid">Completed (Paid)</option>
+              <option value="all">All History</option>
             </select>
           </div>
 
@@ -132,10 +154,10 @@ const Orders = () => {
             <tr className="text-left text-gray-500 text-sm uppercase tracking-wider">
               <th className="px-6 py-3 font-medium">Order ID</th>
               <th className="px-6 py-3 font-medium">Table</th>
-              <th className="px-6 py-3 font-medium">Date</th>
+              <th className="px-6 py-3 font-medium">Order Status</th>
               <th className="px-6 py-3 font-medium">Amount</th>
-              <th className="px-6 py-3 font-medium">Status</th>
-              <th className="px-6 py-3 font-medium">Action</th>
+              <th className="px-6 py-3 font-medium">Payment</th>
+              <th className="px-6 py-3 font-medium text-right">Action</th>
             </tr>
           </thead>
           <tbody>
@@ -167,12 +189,9 @@ const Orders = () => {
                     </div>
                   </td>
                   <td className="px-6 py-4">
-                    <div className="flex items-center gap-2 text-gray-600 text-sm">
-                      <Calendar size={14} />
-                      <span>
-                        {order.date?.toDate ? format(order.date.toDate(), 'dd MMM, HH:mm') : 'N/A'}
-                      </span>
-                    </div>
+                    <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${getDeliveryStatusColor(order.deliveryStatus)}`}>
+                      {order.deliveryStatus || 'Received'}
+                    </span>
                   </td>
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-1 font-bold text-indigo-600">
@@ -184,9 +203,7 @@ const Orders = () => {
                     <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${
                       order.status === 'paid' 
                         ? 'bg-green-100 text-green-700' 
-                        : order.status === 'pending'
-                        ? 'bg-yellow-100 text-yellow-700'
-                        : 'bg-blue-100 text-blue-700'
+                        : 'bg-yellow-100 text-yellow-700'
                     }`}>
                       {order.status}
                     </span>
@@ -206,7 +223,7 @@ const Orders = () => {
         </table>
       </div>
 
-      {/* Order Details Modal (Same as before) */}
+      {/* Order Details Modal */}
       <Modal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
@@ -244,6 +261,39 @@ const Orders = () => {
                 </p>
               </div>
             </div>
+
+            {/* Delivery Status Controls */}
+            <div className="space-y-3">
+              <h4 className="text-xs font-black text-gray-400 uppercase tracking-widest flex items-center gap-2">
+                <ChefHat size={16} className="text-indigo-600" />
+                Preparation Status
+              </h4>
+              <div className="grid grid-cols-3 gap-2">
+                {['Received', 'Preparing', 'Served'].map((status) => (
+                  <button
+                    key={status}
+                    onClick={() => updateDeliveryStatus(selectedOrder.id, status)}
+                    className={`py-2 rounded-xl text-xs font-bold transition-all border ${
+                      (selectedOrder.deliveryStatus || 'Received') === status
+                        ? 'bg-indigo-600 text-white border-indigo-600 shadow-lg shadow-indigo-100'
+                        : 'bg-white text-gray-500 border-gray-100 hover:border-indigo-200'
+                    }`}
+                  >
+                    {status}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {selectedOrder.notes && (
+              <div className="p-4 bg-yellow-50 border-l-4 border-yellow-400 rounded-r-2xl">
+                <p className="text-[10px] text-yellow-600 font-black uppercase tracking-widest mb-1 flex items-center gap-1">
+                  <Hash size={10} />
+                  Customer Suggestion
+                </p>
+                <p className="text-sm font-bold text-yellow-900 italic">"{selectedOrder.notes}"</p>
+              </div>
+            )}
 
             <div className="space-y-3">
               <h4 className="text-sm font-black text-gray-900 uppercase tracking-widest flex items-center gap-2">

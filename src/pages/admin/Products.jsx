@@ -37,6 +37,7 @@ const Products = () => {
     categoryId: '',
     imageUrl: '',
     gstPercent: '0',
+    cookingTime: '15',
     isAvailable: true
   });
 
@@ -77,6 +78,7 @@ const Products = () => {
         categoryId: formData.categoryId,
         imageUrl: formData.imageUrl,
         gstPercent: Number(formData.gstPercent),
+        cookingTime: Number(formData.cookingTime || 15),
         isAvailable: formData.isAvailable,
         updatedAt: serverTimestamp()
       };
@@ -122,6 +124,7 @@ const Products = () => {
       categoryId: product.categoryId,
       imageUrl: product.imageUrl || '',
       gstPercent: product.gstPercent || '0',
+      cookingTime: product.cookingTime || '15',
       isAvailable: product.isAvailable
     });
     setIsModalOpen(true);
@@ -163,6 +166,7 @@ const Products = () => {
       categoryId: '',
       imageUrl: '',
       gstPercent: '0',
+      cookingTime: '15',
       isAvailable: true
     });
   };
@@ -320,6 +324,14 @@ const Products = () => {
               </select>
             </div>
           </div>
+          <Input 
+            label="Cooking Time (mins)" 
+            name="cookingTime" 
+            type="number" 
+            value={formData.cookingTime} 
+            onChange={handleInputChange} 
+            placeholder="15"
+          />
           <div className="grid grid-cols-2 gap-4">
             <Input 
               label="Product Image URL" 

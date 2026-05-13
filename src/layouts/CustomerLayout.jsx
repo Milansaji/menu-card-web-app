@@ -1,7 +1,7 @@
 import React from 'react';
 import { Outlet, Link } from 'react-router-dom';
 import { useCart } from '../contexts/CartContext';
-import { ShoppingCart, Menu as MenuIcon } from 'lucide-react';
+import { ShoppingCart, Menu as MenuIcon, Receipt } from 'lucide-react';
 
 const CustomerLayout = () => {
   const { totalItems } = useCart();
@@ -34,6 +34,19 @@ const CustomerLayout = () => {
       <main className="flex-1 pb-20">
         <Outlet />
       </main>
+
+      {/* Floating My Orders Button */}
+      <Link 
+        to="/track-order"
+        className={`fixed z-50 transition-all duration-500 shadow-2xl flex items-center justify-center gap-2 group ${
+          totalItems > 0 ? 'bottom-24 right-6' : 'bottom-8 right-6'
+        }`}
+      >
+        <div className="bg-yellow-400 text-yellow-900 p-4 rounded-full shadow-lg group-hover:scale-110 transition-transform flex items-center gap-2">
+          <Receipt size={24} />
+          <span className="max-w-0 overflow-hidden group-hover:max-w-xs transition-all duration-500 font-bold whitespace-nowrap">My Orders</span>
+        </div>
+      </Link>
 
       {/* Floating View Cart Button (Mobile) */}
       {totalItems > 0 && (

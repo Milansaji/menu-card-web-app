@@ -9,7 +9,15 @@ export function useCart() {
 export function CartProvider({ children }) {
   const [cart, setCart] = useState([]);
   const [totalItems, setTotalItems] = useState(0);
-  const [tableNumber, setTableNumber] = useState(null);
+  const [tableNumber, setTableNumber] = useState(() => localStorage.getItem('currentTable'));
+
+  useEffect(() => {
+    if (tableNumber) {
+      localStorage.setItem('currentTable', tableNumber);
+    } else {
+      localStorage.removeItem('currentTable');
+    }
+  }, [tableNumber]);
 
   useEffect(() => {
     const count = cart.reduce((acc, item) => acc + item.quantity, 0);

@@ -3,7 +3,7 @@ import { useCart } from '../../contexts/CartContext';
 import { db } from '../../firebase/firebase';
 import { doc, getDoc, addDoc, collection, serverTimestamp } from 'firebase/firestore';
 import { useNavigate } from 'react-router-dom';
-import { CheckCircle2, Receipt, ArrowLeft, Loader2 } from 'lucide-react';
+import { CheckCircle2, Receipt, ArrowLeft, Loader2, Hash } from 'lucide-react';
 import Button from '../../components/Button';
 import Card from '../../components/Card';
 import { toast } from 'react-hot-toast';
@@ -14,6 +14,7 @@ const Checkout = () => {
   const [loading, setLoading] = useState(false);
   const [orderPlaced, setOrderPlaced] = useState(false);
   const [billDetails, setBillDetails] = useState(null);
+  const [notes, setNotes] = useState('');
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -71,17 +72,25 @@ const Checkout = () => {
         invoiceNumber,
         customerName: tableNumber ? `Table ${tableNumber}` : 'Self Order',
         tableNumber: tableNumber || 'N/A',
+        notes: notes,
         items: cart.map(item => ({
           name: item.name,
           price: item.price,
-          quantity: item.quantity
+          quantity: item.quantity,
+          cookingTime: item.cookingTime || 15
         })),
+        totalCookingTime: Math.max(...cart.map(item => Number(item.cookingTime || 15))),
         ...totals,
         date: serverTimestamp(),
         status: 'pending' // Pending confirmation from admin
       };
 
-      await addDoc(collection(db, 'bills'), billData);
+      const docRef = await addDoc(collection(db, 'bills'), billData);
+      
+      // Store order ID in local storage for tracking
+      const previousOrders = JSON.parse(localStorage.getItem('myOrders') || '[]');
+      localStorage.setItem('myOrders', JSON.stringify([...previousOrders, docRef.id]));
+
       setBillDetails(billData);
       setOrderPlaced(true);
       clearCart();
@@ -119,7 +128,7 @@ const Checkout = () => {
           <div className="pt-4 mt-4 border-t border-gray-200 border-dashed">
             <div className="flex justify-between text-xl font-black text-indigo-600">
               <span>Total Paid</span>
-              <span>₹{billDetails?.totalAmount.toFixed(2)}</span>
+              <span>₹{billDetails?.totalAmount?.toFixed(2)}</span>
             </div>
           </div>
         </Card>
@@ -155,20 +164,34 @@ const Checkout = () => {
           {settings && (
             <>
               <div className="flex justify-between text-gray-500 text-sm">
-                <span>CGST ({Number(settings.defaultGstPercent)/2}%)</span>
-                <span>₹{totals.cgst.toFixed(2)}</span>
+                <span>CGST</span>
+                <span>₹{totals.cgst?.toFixed(2)}</span>
               </div>
               <div className="flex justify-between text-gray-500 text-sm">
-                <span>SGST ({Number(settings.defaultGstPercent)/2}%)</span>
-                <span>₹{totals.sgst.toFixed(2)}</span>
+                <span>SGST</span>
+                <span>₹{totals.sgst?.toFixed(2)}</span>
               </div>
             </>
           )}
           <div className="flex justify-between text-xl font-black text-gray-900 pt-4 border-t border-gray-100">
             <span>Amount to Pay</span>
-            <span className="text-indigo-600">₹{totals.totalAmount.toFixed(2)}</span>
+            <span className="text-indigo-600">₹{totals.totalAmount?.toFixed(2)}</span>
           </div>
         </div>
+      </Card>
+      
+      {/* Suggestions */}
+      <Card className="space-y-3" padding="p-6">
+        <h2 className="font-bold text-gray-900 flex items-center gap-2">
+          <Hash className="text-indigo-600" size={20} />
+          Special Instructions
+        </h2>
+        <textarea
+          placeholder="e.g. Make it extra spicy, No onions, etc."
+          className="w-full p-4 bg-gray-50 border-none rounded-2xl focus:ring-2 focus:ring-indigo-500 outline-none text-sm min-h-[100px] shadow-inner"
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
+        />
       </Card>
 
       <div className="bg-indigo-50 p-4 rounded-2xl flex gap-3 items-start">
