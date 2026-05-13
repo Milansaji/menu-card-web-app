@@ -1,36 +1,41 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Basic auth check
+    
     function isAuthenticated() {
       return request.auth != null;
     }
 
-    // Settings: Public read, Auth write
+    function isValidBill() {
+      let bill = request.resource.data;
+      return bill.invoiceNumber is string &&
+             bill.tableNumber is string &&
+             bill.status == 'pending' &&
+             bill.items is list &&
+             bill.totalAmount is number &&
+             bill.date == request.time;
+    }
+
+    // Settings & Content: Public read, Admin write
     match /settings/{docId} {
       allow read: if true;
       allow write: if isAuthenticated();
     }
-
-    // Categories: Public read, Auth write
     match /categories/{docId} {
       allow read: if true;
       allow write: if isAuthenticated();
     }
-
-    // Products: Public read, Auth write
     match /products/{docId} {
       allow read: if true;
       allow write: if isAuthenticated();
     }
 
-    // Bills: Admin full access, Public can create (for self-ordering)
+    // Bills: Public can create with validation, Admin full access
     match /bills/{docId} {
       allow read, update, delete: if isAuthenticated();
-      allow create: if true;
+      allow create: if isValidBill();
     }
 
-    // Users: Auth full access
     match /users/{userId} {
       allow read, write: if isAuthenticated();
     }

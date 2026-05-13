@@ -10,12 +10,23 @@ import { toast } from 'react-hot-toast';
 
 const Checkout = () => {
   const { cart, clearCart, tableNumber } = useCart();
-  const [settings, setSettings] = useState(null);
   const [loading, setLoading] = useState(false);
   const [orderPlaced, setOrderPlaced] = useState(false);
   const [billDetails, setBillDetails] = useState(null);
   const [notes, setNotes] = useState('');
+  const [isOffline, setIsOffline] = useState(!navigator.onLine);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    const handleOnline = () => setIsOffline(false);
+    const handleOffline = () => setIsOffline(true);
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
 
   useEffect(() => {
     const fetchSettings = async () => {
@@ -24,6 +35,16 @@ const Checkout = () => {
     };
     fetchSettings();
   }, []);
+
+  if (!settings && !orderPlaced) {
+    return (
+      <div className="p-6 space-y-6">
+        <div className="h-8 w-48 bg-gray-100 rounded-lg animate-pulse" />
+        <div className="h-48 bg-gray-100 rounded-3xl animate-pulse" />
+        <div className="h-32 bg-gray-100 rounded-3xl animate-pulse" />
+      </div>
+    );
+  }
 
   const calculateSubtotal = () => cart.reduce((acc, item) => acc + (item.price * item.quantity), 0);
 
@@ -62,32 +83,70 @@ const Checkout = () => {
 
   const handlePlaceOrder = async () => {
     if (!settings) return toast.error('Error loading settings. Please try again.');
+    if (isOffline) return toast.error('You are offline. Please check your connection.');
     
     try {
       setLoading(true);
-      const totals = calculateTotals();
-      const invoiceNumber = `INV-${Date.now().toString().slice(-6)}`;
+      
+      // 1. PRICE VERIFICATION (Anti-Tampering)
+      // Re-fetch items from DB to ensure prices are correct
+      const verifiedItems = [];
+      let verifiedSubtotal = 0;
+      let totalTax = 0;
+
+      for (const item of cart) {
+        const productSnap = await getDoc(doc(db, 'products', item.id));
+        if (!productSnap.exists() || !productSnap.data().isAvailable) {
+          throw new Error(`Item ${item.name} is no longer available.`);
+        }
+        
+        const dbProduct = productSnap.data();
+        const price = Number(dbProduct.price);
+        const gst = Number(dbProduct.gstPercent || 0);
+        const lineTotal = price * item.quantity;
+        
+        verifiedItems.push({
+          name: dbProduct.name,
+          price: price,
+          quantity: item.quantity,
+          cookingTime: dbProduct.cookingTime || 15
+        });
+
+        if (settings.gstMode === 'inclusive') {
+          const base = lineTotal / (1 + gst / 100);
+          verifiedSubtotal += base;
+          totalTax += (lineTotal - base);
+        } else {
+          verifiedSubtotal += lineTotal;
+          totalTax += (lineTotal * (gst / 100));
+        }
+      }
+
+      const finalAmount = settings.gstMode === 'inclusive' 
+        ? verifiedItems.reduce((acc, i) => acc + (i.price * i.quantity), 0)
+        : verifiedSubtotal + totalTax;
+
+      // 2. ROBUST INVOICE GENERATION
+      const randomStr = Math.random().toString(36).substring(2, 5).toUpperCase();
+      const invoiceNumber = `INV-${randomStr}-${Date.now().toString().slice(-4)}`;
       
       const billData = {
         invoiceNumber,
         customerName: tableNumber ? `Table ${tableNumber}` : 'Self Order',
         tableNumber: tableNumber || 'N/A',
         notes: notes,
-        items: cart.map(item => ({
-          name: item.name,
-          price: item.price,
-          quantity: item.quantity,
-          cookingTime: item.cookingTime || 15
-        })),
-        totalCookingTime: Math.max(...cart.map(item => Number(item.cookingTime || 15))),
-        ...totals,
+        items: verifiedItems,
+        totalCookingTime: Math.max(...verifiedItems.map(item => Number(item.cookingTime || 15))),
+        subtotal: verifiedSubtotal,
+        cgst: totalTax / 2,
+        sgst: totalTax / 2,
+        totalAmount: finalAmount,
         date: serverTimestamp(),
-        status: 'pending' // Pending confirmation from admin
+        status: 'pending'
       };
 
       const docRef = await addDoc(collection(db, 'bills'), billData);
       
-      // Store order ID in local storage for tracking
       const previousOrders = JSON.parse(localStorage.getItem('myOrders') || '[]');
       localStorage.setItem('myOrders', JSON.stringify([...previousOrders, docRef.id]));
 
@@ -97,7 +156,7 @@ const Checkout = () => {
       toast.success('Order placed successfully!');
     } catch (error) {
       console.error(error);
-      toast.error('Failed to place order');
+      toast.error(error.message || 'Failed to place order');
     } finally {
       setLoading(false);
     }
@@ -144,6 +203,11 @@ const Checkout = () => {
 
   return (
     <div className="p-6 space-y-6 animate-in slide-in-from-right-4 duration-500 pb-32">
+      {isOffline && (
+        <div className="bg-red-500 text-white p-3 rounded-2xl text-center text-sm font-bold animate-pulse">
+          You are currently offline. Some features may not work.
+        </div>
+      )}
       <header className="flex items-center gap-4">
         <button onClick={() => navigate(-1)} className="p-2 hover:bg-gray-100 rounded-full">
           <ArrowLeft size={24} />

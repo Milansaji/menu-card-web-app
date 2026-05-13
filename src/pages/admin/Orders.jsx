@@ -25,6 +25,10 @@ const Orders = () => {
   });
   const [currentSound, setCurrentSound] = useState('bell');
 
+  const [isKitchenActive, setIsKitchenActive] = useState(false);
+  const blinkRef = useRef(null);
+  const timeoutRef = useRef(null);
+
   const prevOrdersCount = useRef(0);
 
   // Fetch sound settings
@@ -42,67 +46,22 @@ const Orders = () => {
     fetchSettings();
   }, []);
 
+  // Kitchen Session Trigger (satisfies audio policy)
+  const startKitchenSession = () => {
+    playSound(currentSound);
+    setIsKitchenActive(true);
+    toast.success('Kitchen alerts activated!', { icon: '🧑‍🍳' });
+  };
+
   // Main real-time listener
   useEffect(() => {
     const q = query(collection(db, 'bills'), orderBy('date', 'desc'));
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const newOrders = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      
-      // Notification Logic
-      if (newOrders.length > prevOrdersCount.current && prevOrdersCount.current !== 0) {
-        const latest = newOrders[0];
-        playSound(currentSound);
-        
-        // Blink Title
-        const originalTitle = document.title;
-        let isBlinking = true;
-        const blinkInterval = setInterval(() => {
-          document.title = isBlinking ? '🚨 NEW ORDER! 🚨' : originalTitle;
-          isBlinking = !isBlinking;
-        }, 1000);
-        
-        setTimeout(() => {
-          clearInterval(blinkInterval);
-          document.title = originalTitle;
-        }, 10000);
-        
-        // Custom Toast
-        toast.custom((t) => (
-          <div className={`${t.visible ? 'animate-in slide-in-from-top-full' : 'animate-out fade-out'} max-w-md w-full bg-slate-900 shadow-2xl rounded-3xl pointer-events-auto flex ring-1 ring-black ring-opacity-5 p-4 border-2 border-indigo-500`}>
-            <div className="flex-1 w-0 p-1">
-              <div className="flex items-start">
-                <div className="flex-shrink-0 pt-0.5">
-                  <div className="h-12 w-12 rounded-2xl bg-indigo-500 flex items-center justify-center text-white shadow-lg shadow-indigo-500/50">
-                    <ChefHat size={24} />
-                  </div>
-                </div>
-                <div className="ml-4 flex-1">
-                  <p className="text-xs font-black text-indigo-400 uppercase tracking-[0.2em] mb-1">New Order Incoming</p>
-                  <p className="text-xl font-black text-white">Table {latest.tableNumber}</p>
-                  <p className="mt-1 text-sm font-bold text-slate-400">Order ID: #{latest.invoiceNumber}</p>
-                </div>
-              </div>
-            </div>
-            <div className="flex border-l border-slate-800 ml-4 pl-4">
-              <button
-                onClick={() => {
-                  toast.dismiss(t.id);
-                  openOrderDetails(latest);
-                }}
-                className="w-full border border-transparent rounded-none rounded-r-lg flex items-center justify-center text-sm font-black text-indigo-400 hover:text-indigo-300 focus:outline-none"
-              >
-                VIEW
-              </button>
-            </div>
-          </div>
-        ), { duration: 15000, position: 'top-center' });
-      }
-
       setOrders(newOrders);
       setLoading(false);
-      prevOrdersCount.current = newOrders.length;
-
-      // Stats
+      
+      // Update Stats
       const today = newOrders.filter(o => o.date?.toDate && isToday(o.date.toDate()));
       setStats({
         todaySales: today.reduce((acc, o) => acc + (o.totalAmount || 0), 0),
@@ -111,7 +70,73 @@ const Orders = () => {
       });
     });
     return () => unsubscribe();
-  }, [currentSound]);
+  }, []);
+
+  // Robust Notification Handler
+  useEffect(() => {
+    if (!isKitchenActive || orders.length <= prevOrdersCount.current || prevOrdersCount.current === 0) {
+      prevOrdersCount.current = orders.length;
+      return;
+    }
+
+    const latest = orders[0];
+    playSound(currentSound);
+
+    // Controlled Title Blink with Cleanup
+    if (blinkRef.current) clearInterval(blinkRef.current);
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+
+    const originalTitle = document.title;
+    let toggle = true;
+    blinkRef.current = setInterval(() => {
+      document.title = toggle ? '🚨 NEW ORDER! 🚨' : originalTitle;
+      toggle = !toggle;
+    }, 1000);
+
+    timeoutRef.current = setTimeout(() => {
+      clearInterval(blinkRef.current);
+      document.title = originalTitle;
+      blinkRef.current = null;
+    }, 10000);
+
+    // Custom Toast
+    toast.custom((t) => (
+      <div className={`${t.visible ? 'animate-in slide-in-from-top-full' : 'animate-out fade-out'} max-w-md w-full bg-slate-900 shadow-2xl rounded-3xl pointer-events-auto flex ring-1 ring-black ring-opacity-5 p-4 border-2 border-indigo-500`}>
+        <div className="flex-1 w-0 p-1">
+          <div className="flex items-start">
+            <div className="flex-shrink-0 pt-0.5">
+              <div className="h-12 w-12 rounded-2xl bg-indigo-500 flex items-center justify-center text-white shadow-lg shadow-indigo-500/50">
+                <ChefHat size={24} />
+              </div>
+            </div>
+            <div className="ml-4 flex-1">
+              <p className="text-xs font-black text-indigo-400 uppercase tracking-[0.2em] mb-1">New Order Incoming</p>
+              <p className="text-xl font-black text-white">Table {latest.tableNumber}</p>
+              <p className="mt-1 text-sm font-bold text-slate-400">Order ID: #{latest.invoiceNumber}</p>
+            </div>
+          </div>
+        </div>
+        <div className="flex border-l border-slate-800 ml-4 pl-4">
+          <button
+            onClick={() => {
+              toast.dismiss(t.id);
+              openOrderDetails(latest);
+            }}
+            className="w-full border border-transparent rounded-none rounded-r-lg flex items-center justify-center text-sm font-black text-indigo-400 hover:text-indigo-300 focus:outline-none"
+          >
+            VIEW
+          </button>
+        </div>
+      </div>
+    ), { duration: 15000, position: 'top-center' });
+
+    prevOrdersCount.current = orders.length;
+
+    return () => {
+      if (blinkRef.current) clearInterval(blinkRef.current);
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    };
+  }, [orders.length, isKitchenActive, currentSound]);
 
   const openOrderDetails = (order) => {
     setSelectedOrder(order);
@@ -177,15 +202,18 @@ const Orders = () => {
         </div>
         <div className="flex gap-3">
           <button 
-            onClick={() => {
-              playSound(currentSound);
-              toast.success('Sound test successful!', { icon: '🔊' });
-            }}
-            className="bg-white text-gray-600 p-3 rounded-2xl border border-gray-100 shadow-sm hover:bg-gray-50 transition-colors flex items-center gap-2 group"
-            title="Test Notification Sound"
+            onClick={startKitchenSession}
+            disabled={isKitchenActive}
+            className={`p-3 rounded-2xl border transition-all flex items-center gap-2 group active:scale-95 ${
+              isKitchenActive 
+                ? 'bg-green-50 border-green-200 text-green-600' 
+                : 'bg-white border-gray-100 text-gray-600 hover:bg-gray-50 shadow-sm'
+            }`}
           >
-            <ChefHat size={20} className="group-hover:rotate-12 transition-transform" />
-            <span className="text-xs font-bold">Test Sound</span>
+            <ChefHat size={20} className={isKitchenActive ? 'animate-bounce' : 'group-hover:rotate-12 transition-transform'} />
+            <span className="text-xs font-bold whitespace-nowrap">
+              {isKitchenActive ? 'Kitchen Session Active' : 'Start Kitchen Session'}
+            </span>
           </button>
           <div className="bg-indigo-600 text-white p-3 rounded-2xl shadow-lg shadow-indigo-100 flex items-center gap-3">
             <IndianRupee size={24} />
@@ -199,35 +227,43 @@ const Orders = () => {
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="bg-white p-4 rounded-3xl border border-gray-100 shadow-sm flex items-center gap-4">
-          <div className="w-12 h-12 bg-orange-100 text-orange-600 rounded-2xl flex items-center justify-center">
-            <ChefHat size={24} />
-          </div>
-          <div>
-            <p className="text-xs text-gray-400 font-bold uppercase tracking-widest">Active Orders</p>
-            <p className="text-2xl font-black text-gray-900">{stats.pendingOrders}</p>
-          </div>
-        </div>
-        <div className="bg-white p-4 rounded-3xl border border-gray-100 shadow-sm flex items-center gap-4">
-          <div className="w-12 h-12 bg-green-100 text-green-600 rounded-2xl flex items-center justify-center">
-            <CheckCircle2 size={24} />
-          </div>
-          <div>
-            <p className="text-xs text-gray-400 font-bold uppercase tracking-widest">Today's Count</p>
-            <p className="text-2xl font-black text-gray-900">{stats.todayCount}</p>
-          </div>
-        </div>
-        <div className="bg-white p-4 rounded-3xl border border-gray-100 shadow-sm flex items-center gap-4">
-          <div className="w-12 h-12 bg-indigo-100 text-indigo-600 rounded-2xl flex items-center justify-center">
-            <ShoppingBag size={24} />
-          </div>
-          <div>
-            <p className="text-xs text-gray-400 font-bold uppercase tracking-widest">Success Rate</p>
-            <p className="text-2xl font-black text-gray-900">
-              {orders.length > 0 ? Math.round((orders.filter(o => o.status === 'paid').length / orders.length) * 100) : 0}%
-            </p>
-          </div>
-        </div>
+        {loading ? (
+          Array(3).fill(0).map((_, i) => (
+            <div key={i} className="h-24 bg-gray-100 rounded-3xl animate-pulse" />
+          ))
+        ) : (
+          <>
+            <div className="bg-white p-4 rounded-3xl border border-gray-100 shadow-sm flex items-center gap-4">
+              <div className="w-12 h-12 bg-orange-100 text-orange-600 rounded-2xl flex items-center justify-center">
+                <ChefHat size={24} />
+              </div>
+              <div>
+                <p className="text-xs text-gray-400 font-bold uppercase tracking-widest">Active Orders</p>
+                <p className="text-2xl font-black text-gray-900">{stats.pendingOrders}</p>
+              </div>
+            </div>
+            <div className="bg-white p-4 rounded-3xl border border-gray-100 shadow-sm flex items-center gap-4">
+              <div className="w-12 h-12 bg-green-100 text-green-600 rounded-2xl flex items-center justify-center">
+                <CheckCircle2 size={24} />
+              </div>
+              <div>
+                <p className="text-xs text-gray-400 font-bold uppercase tracking-widest">Today's Count</p>
+                <p className="text-2xl font-black text-gray-900">{stats.todayCount}</p>
+              </div>
+            </div>
+            <div className="bg-white p-4 rounded-3xl border border-gray-100 shadow-sm flex items-center gap-4">
+              <div className="w-12 h-12 bg-indigo-100 text-indigo-600 rounded-2xl flex items-center justify-center">
+                <ShoppingBag size={24} />
+              </div>
+              <div>
+                <p className="text-xs text-gray-400 font-bold uppercase tracking-widest">Success Rate</p>
+                <p className="text-2xl font-black text-gray-900">
+                  {orders.length > 0 ? Math.round((orders.filter(o => o.status === 'paid').length / orders.length) * 100) : 0}%
+                </p>
+              </div>
+            </div>
+          </>
+        )}
       </div>
 
       {/* Filters Bar */}

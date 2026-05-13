@@ -8,14 +8,30 @@ import Card from '../../components/Card';
 import Input from '../../components/Input';
 import Button from '../../components/Button';
 
+import logo from '../../assets/logo.webp';
+
 const QRGenerator = () => {
   const [restaurantName, setRestaurantName] = useState('');
   const [restaurantId, setRestaurantId] = useState('main'); 
   const [tableNumber, setTableNumber] = useState('');
   const [copied, setCopied] = useState(false);
+  const [logoDataUri, setLogoDataUri] = useState('');
   const qrRef = useRef();
 
   useEffect(() => {
+    // Convert logo to data URI for reliable SVG serialization
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = img.width;
+      canvas.height = img.height;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0);
+      setLogoDataUri(canvas.toDataURL('image/png'));
+    };
+    img.src = logo;
+
     const fetchSettings = async () => {
       const docSnap = await getDoc(doc(db, 'settings', 'config'));
       if (docSnap.exists()) {
@@ -40,6 +56,7 @@ const QRGenerator = () => {
     const canvas = document.createElement('canvas');
     const ctx = canvas.getContext('2d');
     const img = new Image();
+    
     img.onload = () => {
       canvas.width = img.width;
       canvas.height = img.height;
@@ -52,7 +69,9 @@ const QRGenerator = () => {
       downloadLink.href = pngFile;
       downloadLink.click();
     };
-    img.src = 'data:image/svg+xml;base64,' + btoa(svgData);
+
+    // Use a higher scale for better print quality
+    img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgData)));
   };
 
   return (
@@ -110,15 +129,13 @@ const QRGenerator = () => {
               size={240}
               level="H"
               includeMargin={true}
-              imageSettings={{
-                src: "https://cdn-icons-png.flaticon.com/512/1046/1046784.png",
-                x: undefined,
-                y: undefined,
-                height: 40,
-                width: 40,
-                excavate: true,
-              }}
-            />
+                imageSettings={{
+                  src: logoDataUri || logo,
+                  height: 60,
+                  width: 60,
+                  excavate: true,
+                }}
+              />
             {tableNumber && (
               <div className="mt-4 text-center">
                 <span className="px-4 py-1 bg-indigo-600 text-white text-sm font-black rounded-full">

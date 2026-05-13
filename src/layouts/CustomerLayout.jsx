@@ -6,6 +6,8 @@ import { ShoppingCart, Menu as MenuIcon, Receipt, Hash } from 'lucide-react';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../firebase/firebase';
 
+import logoAsset from '../assets/logo.webp';
+
 const CustomerLayout = () => {
   const { totalItems, tableNumber } = useCart();
   const [logo, setLogo] = React.useState(null);
@@ -15,8 +17,11 @@ const CustomerLayout = () => {
     const fetchLogo = async () => {
       const docSnap = await getDoc(doc(db, 'settings', 'config'));
       if (docSnap.exists()) {
-        setLogo(docSnap.data().logoUrl);
-        setHotelName(docSnap.data().restaurantName || 'FoodieMenu');
+        const data = docSnap.data();
+        setLogo(data.logoUrl || logoAsset);
+        setHotelName(data.restaurantName || 'FoodieMenu');
+      } else {
+        setLogo(logoAsset);
       }
     };
     fetchLogo();
@@ -27,13 +32,12 @@ const CustomerLayout = () => {
       {/* Header */}
       <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-gray-100 px-4 py-3 flex items-center justify-between">
         <Link to="/menu/main" className="flex items-center gap-2">
-          {logo ? (
-            <img src={logo} alt={hotelName} className="w-10 h-10 rounded-xl object-cover shadow-sm border border-gray-100" />
-          ) : (
-            <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center shadow-lg shadow-indigo-100">
-              <MenuIcon className="text-white" size={20} />
-            </div>
-          )}
+          <img 
+            src={logo || logoAsset} 
+            alt={hotelName} 
+            className="w-10 h-10 rounded-xl object-cover shadow-sm border border-gray-100" 
+            onError={(e) => { e.target.src = logoAsset; }}
+          />
           <div className="flex flex-col">
             <span className="font-black text-sm text-gray-900 leading-tight tracking-tight uppercase">{hotelName}</span>
             {tableNumber && (

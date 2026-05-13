@@ -160,7 +160,8 @@ const DigitalMenu = () => {
         <div className="flex gap-3 overflow-x-auto pb-4 scrollbar-hide animate-in fade-in slide-in-from-left-4 duration-700">
           <button
             onClick={() => setSelectedCategory('all')}
-            className={`whitespace-nowrap px-6 py-2.5 rounded-full text-sm font-bold transition-all duration-300 ${
+            aria-pressed={selectedCategory === 'all'}
+            className={`whitespace-nowrap px-6 py-2.5 rounded-full text-sm font-bold transition-all duration-300 active:scale-95 ${
               selectedCategory === 'all' 
                 ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-100 scale-105' 
                 : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
@@ -172,7 +173,8 @@ const DigitalMenu = () => {
             <button
               key={cat.id}
               onClick={() => setSelectedCategory(cat.id)}
-              className={`whitespace-nowrap px-6 py-2.5 rounded-full text-sm font-bold transition-all ${
+              aria-pressed={selectedCategory === cat.id}
+              className={`whitespace-nowrap px-6 py-2.5 rounded-full text-sm font-bold transition-all active:scale-95 ${
                 selectedCategory === cat.id 
                   ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-100 scale-105' 
                   : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
@@ -192,11 +194,11 @@ const DigitalMenu = () => {
             {filteredProducts.map((product, index) => (
               <Card 
                 key={product.id} 
-                className="flex gap-4 p-3 border-none shadow-sm hover:shadow-xl hover:scale-[1.02] transition-all duration-300 animate-in fade-in slide-in-from-bottom-4 fill-mode-both" 
+                className="flex gap-4 p-3 border-none shadow-sm hover:shadow-xl hover:scale-[1.01] transition-all duration-300 animate-in fade-in slide-in-from-bottom-4 fill-mode-both @container" 
                 padding="p-3"
-                style={{ animationDelay: `${index * 100}ms` }}
+                style={{ animationDelay: `${Math.min(index, 5) * 100}ms` }}
               >
-                <div className="w-24 h-24 sm:w-32 sm:h-32 bg-gray-50 rounded-2xl overflow-hidden flex-shrink-0 relative group">
+                <div className="w-24 h-24 @[400px]:w-32 @[400px]:h-32 bg-gray-50 rounded-2xl overflow-hidden flex-shrink-0 relative group">
                   {product.imageUrl ? (
                     <img src={product.imageUrl} alt={product.name} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />
                   ) : (
@@ -214,13 +216,14 @@ const DigitalMenu = () => {
                 <div className="flex-1 flex flex-col justify-between py-1">
                   <div>
                     <h3 className="font-bold text-gray-900 line-clamp-1">{product.name}</h3>
-                    <p className="text-xs text-gray-500 line-clamp-2 mt-1">{product.description}</p>
+                    <p className="text-xs text-gray-500 line-clamp-2 mt-1 leading-relaxed">{product.description}</p>
                   </div>
                   <div className="flex items-center justify-between mt-2">
                     <span className="text-indigo-600 font-black">₹{product.price}</span>
                     <button 
                       onClick={() => handleAddToCart(product)}
-                      className="p-2 bg-indigo-50 text-indigo-600 rounded-lg hover:bg-indigo-600 hover:text-white transition-all active:scale-90"
+                      className="p-2 bg-indigo-50 text-indigo-600 rounded-lg hover:bg-indigo-600 hover:text-white transition-all active:scale-90 shadow-sm hover:shadow-indigo-200/50"
+                      aria-label={`Add ${product.name} to cart`}
                     >
                       <Plus size={20} />
                     </button>

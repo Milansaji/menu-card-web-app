@@ -198,19 +198,6 @@ const Settings = () => {
                     <CheckCircle2 size={12} />
                   </div>
                 )}
-                
-                {/* Preview Button */}
-                <button 
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    playSound(sound.id);
-                  }}
-                  className="mt-4 px-4 py-2 bg-indigo-100 text-indigo-600 rounded-full text-xs font-black hover:bg-indigo-600 hover:text-white transition-all flex items-center gap-2 shadow-sm active:scale-95"
-                >
-                  <Play size={12} fill="currentColor" /> 
-                  PLAY PREVIEW
-                </button>
               </div>
             ))}
           </div>
