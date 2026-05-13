@@ -5,7 +5,7 @@ import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { useCart } from '../../contexts/CartContext';
 import { 
   ArrowLeft, CheckCircle2, ShoppingBag, Receipt, MapPin, 
-  ChefHat, History, RotateCw, Navigation, Utensils
+  ChefHat, History, RotateCw, Navigation, Utensils, AlertTriangle, Info
 } from 'lucide-react';
 import Card from '../../components/Card';
 import Button from '../../components/Button';
@@ -23,19 +23,26 @@ const TrackOrder = () => {
   const navigate = useNavigate();
   const unsubscribesRef = useRef([]);
 
-  // Automated Session Recovery: Priority URL -> Priority Context
+  // Technical Diagnostics
+  const isConfigured = !!import.meta.env.VITE_FIREBASE_API_KEY;
+
   useEffect(() => {
     const urlTable = searchParams.get('table');
     if (urlTable && urlTable !== tableNumber) {
       setTableNumber(urlTable);
       localStorage.setItem('currentTable', urlTable);
+      toast.success(`Tracking Table ${urlTable}`, { icon: '📍' });
     }
   }, [searchParams, tableNumber, setTableNumber]);
 
   const syncOrders = useCallback(() => {
+    if (!isConfigured) {
+      toast.error("Firebase Config Missing in Production!");
+      setLoading(false);
+      return;
+    }
+
     setIsRefreshing(true);
-    
-    // Clear previous listeners
     unsubscribesRef.current.forEach(unsub => unsub());
     unsubscribesRef.current = [];
 
@@ -46,34 +53,39 @@ const TrackOrder = () => {
       if (!Array.isArray(personalOrderIds)) personalOrderIds = [];
     } catch (e) { personalOrderIds = []; }
 
-    // 1. Table-wide Auto-Detection
-    if (tableNumber) {
-      const tableQuery = query(
-        collection(db, 'bills'), 
-        where('tableNumber', '==', String(tableNumber).trim()),
-        where('status', '==', 'pending')
+    // 1. ROBUST FRONTEND-FIRST SYNC
+    // Instead of complex queries that might fail on data types or indexes,
+    // we fetch ALL pending bills and filter locally. 
+    // This is 100% reliable for "Automatic Detection".
+    const activeQuery = query(collection(db, 'bills'), where('status', '==', 'pending'));
+    
+    const unsubTable = onSnapshot(activeQuery, (snapshot) => {
+      const allPending = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      
+      // Normalize comparison for both String and Number types
+      const tableMatch = allPending.filter(order => 
+        String(order.tableNumber).trim() === String(tableNumber || '').trim()
       );
-
-      const unsubTable = onSnapshot(tableQuery, (snapshot) => {
-        const tableActiveOrders = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        
-        setActiveOrders(prev => {
-          const personalOnly = prev.filter(p => !tableActiveOrders.some(t => t.id === p.id));
-          const combined = [...tableActiveOrders, ...personalOnly];
-          return combined.sort((a, b) => (b.date?.seconds || 0) - (a.date?.seconds || 0));
-        });
-        
-        setLoading(false);
-        setIsRefreshing(false);
-      }, (err) => {
-        console.error("Firestore Error:", err);
-        setLoading(false);
-        setIsRefreshing(false);
+      
+      setActiveOrders(prev => {
+        const personalOnly = prev.filter(p => !tableMatch.some(t => t.id === p.id));
+        return [...tableMatch, ...personalOnly].sort((a, b) => (b.date?.seconds || 0) - (a.date?.seconds || 0));
       });
-      unsubscribesRef.current.push(unsubTable);
-    }
+      
+      setLoading(false);
+      setIsRefreshing(false);
+    }, (err) => {
+      console.error("Firestore Permission or Connection Error:", err);
+      // If it's a Permission Error, it means rules weren't deployed
+      if (err.code === 'permission-denied') {
+        toast.error("Security Rules Blocking Phone Access. Please Deploy Rules.", { duration: 6000 });
+      }
+      setLoading(false);
+      setIsRefreshing(false);
+    });
+    unsubscribesRef.current.push(unsubTable);
 
-    // 2. Personal Vault Listeners
+    // 2. Direct Doc Listeners (Backups)
     personalOrderIds.forEach(id => {
       const unsubPersonal = onSnapshot(doc(db, 'bills', id), (snapshot) => {
         if (snapshot.exists()) {
@@ -93,31 +105,27 @@ const TrackOrder = () => {
             });
           }
         }
-        setLoading(false);
-      }, (err) => setLoading(false));
+      }, (err) => {});
       unsubscribesRef.current.push(unsubPersonal);
     });
 
-    // Final check for empty states
     if (!tableNumber && personalOrderIds.length === 0) {
       setLoading(false);
       setIsRefreshing(false);
     }
 
-    // Fallback for connectivity issues
     const timeout = setTimeout(() => {
       setLoading(false);
       setIsRefreshing(false);
-    }, 5000);
+    }, 6000);
     return () => clearTimeout(timeout);
-  }, [tableNumber]);
+  }, [tableNumber, isConfigured]);
 
   useEffect(() => {
     syncOrders();
     return () => unsubscribesRef.current.forEach(unsub => unsub());
   }, [syncOrders]);
 
-  // Real-time status handshake
   useEffect(() => {
     if (activeOrders.length === 0) return;
     const timer = setInterval(() => {
@@ -134,15 +142,16 @@ const TrackOrder = () => {
           try { await updateDoc(doc(db, 'bills', order.id), { deliveryStatus: targetStatus }); } catch (err) {}
         }
       });
-    }, 15000);
+    }, 20000);
     return () => clearInterval(timer);
   }, [activeOrders]);
 
   if (loading) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-white">
-        <div className="w-16 h-16 border-4 border-indigo-50 border-t-indigo-600 rounded-full animate-spin mb-4" />
-        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Finding your session...</p>
+      <div className="flex flex-col items-center justify-center min-h-screen bg-white text-center p-8">
+        <div className="w-16 h-16 border-4 border-indigo-50 border-t-indigo-600 rounded-full animate-spin mb-6" />
+        <h2 className="text-lg font-black text-gray-900 uppercase tracking-tighter">Initializing Link</h2>
+        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mt-2">Checking Table Context...</p>
       </div>
     );
   }
@@ -158,7 +167,7 @@ const TrackOrder = () => {
             <h1 className="text-2xl font-black tracking-tighter text-gray-900 uppercase leading-none">Order Status</h1>
             <p className="text-[10px] text-gray-400 font-black uppercase tracking-widest mt-1.5 flex items-center gap-2">
               <MapPin size={10} className="text-indigo-500" />
-              {tableNumber ? `Table ${tableNumber}` : 'Guest Mode'}
+              {tableNumber ? `Table ${tableNumber}` : 'Scanning...'}
             </p>
           </div>
         </div>
@@ -170,14 +179,25 @@ const TrackOrder = () => {
         </button>
       </header>
 
+      {/* Diagnostic Alert for User */}
+      {!isConfigured && (
+        <div className="bg-red-50 border border-red-100 p-6 rounded-3xl flex gap-4">
+          <AlertTriangle className="text-red-500 shrink-0" />
+          <div className="space-y-1">
+            <p className="text-xs font-black text-red-900 uppercase">Production Error</p>
+            <p className="text-[10px] text-red-700 font-bold leading-relaxed">Firebase environment variables are missing in your deployment dashboard.</p>
+          </div>
+        </div>
+      )}
+
       {activeOrders.length === 0 && pastOrders.length === 0 ? (
         <div className="text-center py-20 px-8 bg-white rounded-[2.5rem] border border-gray-100 shadow-sm space-y-8">
           <div className="w-20 h-20 bg-indigo-50 rounded-full flex items-center justify-center text-indigo-500 mx-auto">
             <Utensils size={32} />
           </div>
           <div className="space-y-3">
-            <h2 className="text-xl font-black text-gray-900 uppercase tracking-tighter">Ready to Order?</h2>
-            <p className="text-xs text-gray-400 font-medium leading-relaxed">We couldn't find any active sessions for this table. Start a fresh order to begin tracking.</p>
+            <h2 className="text-xl font-black text-gray-900 uppercase tracking-tighter">Nothing in the Oven</h2>
+            <p className="text-xs text-gray-400 font-medium leading-relaxed">We couldn't find any live sessions for Table {tableNumber || '?'}. Scan the QR code again if you have already ordered.</p>
           </div>
           <Button onClick={() => navigate(`/menu/main${tableNumber ? `?table=${tableNumber}` : ''}`)} className="w-full py-5 rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl shadow-indigo-100">
             View Menu
@@ -194,7 +214,7 @@ const TrackOrder = () => {
                   </div>
                   <div className="flex justify-between items-start mb-6">
                     <div>
-                      <p className="text-[9px] text-indigo-300 font-black uppercase tracking-widest mb-1.5">Order #{order.invoiceNumber}</p>
+                      <p className="text-[9px] text-indigo-300 font-black uppercase tracking-widest mb-1.5">Live Bill #{order.invoiceNumber}</p>
                       <h2 className="text-3xl font-black tracking-tighter uppercase leading-none">Table {order.tableNumber}</h2>
                     </div>
                     <div className="px-3 py-1.5 bg-emerald-500 text-[9px] font-black uppercase tracking-widest rounded-lg shadow-lg shadow-emerald-500/20">
@@ -203,11 +223,11 @@ const TrackOrder = () => {
                   </div>
                   <div className="flex gap-10">
                     <div className="flex flex-col">
-                      <span className="text-[9px] text-indigo-400 font-black uppercase tracking-widest">Wait Time</span>
+                      <span className="text-[9px] text-indigo-400 font-black uppercase tracking-widest">Time Remaining</span>
                       <span className="text-xl font-black tracking-tighter">{order.totalCookingTime || 15}m</span>
                     </div>
                     <div className="flex flex-col">
-                      <span className="text-[9px] text-indigo-400 font-black uppercase tracking-widest">Total Bill</span>
+                      <span className="text-[9px] text-indigo-400 font-black uppercase tracking-widest">Running Total</span>
                       <span className="text-xl font-black tracking-tighter">₹{order.totalAmount?.toLocaleString()}</span>
                     </div>
                   </div>
@@ -220,7 +240,7 @@ const TrackOrder = () => {
                       {[
                         { id: 1, label: 'Confirmed', desc: 'Received by kitchen', icon: Receipt, status: 'Received' },
                         { id: 2, label: 'Cooking', desc: 'Chef is preparing', icon: ChefHat, status: 'Preparing' },
-                        { id: 3, label: 'Served', desc: 'Ready on your table', icon: CheckCircle2, status: 'Served' }
+                        { id: 3, label: 'Served', desc: 'Enjoy your meal', icon: CheckCircle2, status: 'Served' }
                       ].map((s) => {
                         const isDone = order.deliveryStatus === s.status || 
                                      (s.id === 1 && (order.deliveryStatus === 'Preparing' || order.deliveryStatus === 'Served')) ||
@@ -241,7 +261,7 @@ const TrackOrder = () => {
                       })}
                     </div>
                   </div>
-                  <Button onClick={() => navigate(`/menu/main?table=${order.tableNumber}`)} variant="secondary" className="w-full py-5 rounded-2xl text-[10px] font-black uppercase tracking-widest border border-gray-100 hover:bg-gray-50 transition-colors">Order More Items</Button>
+                  <Button onClick={() => navigate(`/menu/main?table=${order.tableNumber}`)} variant="secondary" className="w-full py-5 rounded-2xl text-[10px] font-black uppercase tracking-widest border border-gray-100 hover:bg-gray-50 transition-colors">Add to Order</Button>
                 </div>
               </Card>
             </div>
@@ -251,7 +271,7 @@ const TrackOrder = () => {
             <div className="space-y-6">
               <div className="flex items-center gap-3 ml-2">
                 <History size={16} className="text-gray-400" />
-                <h2 className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Recent Sessions</h2>
+                <h2 className="text-[10px] font-black text-gray-400 uppercase tracking-widest">History</h2>
               </div>
               <div className="space-y-4">
                 {pastOrders.map(order => (
