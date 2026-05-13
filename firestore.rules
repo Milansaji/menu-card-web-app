@@ -30,10 +30,12 @@ service cloud.firestore {
       allow write: if isAuthenticated();
     }
 
-    // Bills: Public can create with validation, Admin full access
+    // Bills: Public can create/track, Admin full access
     match /bills/{docId} {
-      allow read, update, delete: if isAuthenticated();
       allow create: if isValidBill();
+      allow get: if true; // Allow guests to track their own orders by ID
+      allow list: if true; // Allow table-wide tracking queries
+      allow update, delete: if isAuthenticated();
     }
 
     match /users/{userId} {
