@@ -76,3 +76,12 @@ body {
 html {
   scroll-behavior: smooth;
 }
+
+@keyframes infinite-loading {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(200%); }
+}
+
+.animate-infinite-loading {
+  animation: infinite-loading 1.5s ease-in-out infinite;
+}

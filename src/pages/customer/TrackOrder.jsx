@@ -1,9 +1,9 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { db } from '../../firebase/firebase';
 import { doc, onSnapshot, updateDoc } from 'firebase/firestore';
 import { useNavigate, Link } from 'react-router-dom';
 import { useCart } from '../../contexts/CartContext';
-import { ArrowLeft, Clock, CheckCircle2, ShoppingBag, Receipt, MapPin, Hash, ChefHat, Sparkles, History, RotateCw } from 'lucide-react';
+import { ArrowLeft, Clock, CheckCircle2, ShoppingBag, Receipt, MapPin, Hash, ChefHat, Sparkles, History, RotateCw, Navigation } from 'lucide-react';
 import Card from '../../components/Card';
 import Button from '../../components/Button';
 import { format } from 'date-fns';
@@ -16,17 +16,32 @@ const TrackOrder = () => {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const { tableNumber } = useCart();
   const navigate = useNavigate();
+  const unsubscribesRef = useRef([]);
 
-  const fetchOrders = useCallback(() => {
-    const orderIds = JSON.parse(localStorage.getItem('myOrders') || '[]');
+  const syncOrders = useCallback(() => {
+    const existingHistory = localStorage.getItem('myOrders');
+    let orderIds = [];
+    try {
+      orderIds = existingHistory ? JSON.parse(existingHistory) : [];
+      if (!Array.isArray(orderIds)) orderIds = [];
+    } catch (e) {
+      orderIds = [];
+    }
     
     if (orderIds.length === 0) {
       setLoading(false);
-      return [];
+      return;
     }
 
     setIsRefreshing(true);
-    const unsubscribes = orderIds.map(id => 
+    // Clear previous listeners
+    unsubscribesRef.current.forEach(unsub => unsub());
+    unsubscribesRef.current = [];
+
+    let processedCount = 0;
+    const totalIds = orderIds.length;
+
+    const newUnsubs = orderIds.map(id => 
       onSnapshot(doc(db, 'bills', id), (snapshot) => {
         if (snapshot.exists()) {
           const data = snapshot.data();
@@ -45,59 +60,47 @@ const TrackOrder = () => {
             });
           }
         }
+        
+        // This ensures we only stop loading once we've at least tried to hit every ID
+        processedCount++;
+        if (processedCount >= totalIds) {
+          setLoading(false);
+          setIsRefreshing(false);
+        }
       }, (err) => {
-        console.error("Order sync error:", err);
+        console.error(`Sync error for ${id}:`, err);
+        processedCount++;
+        if (processedCount >= totalIds) setLoading(false);
       })
     );
 
-    setLoading(false);
-    setTimeout(() => setIsRefreshing(false), 1000);
-    return unsubscribes;
+    unsubscribesRef.current = newUnsubs;
   }, [tableNumber]);
 
   useEffect(() => {
-    const unsubscribes = fetchOrders();
-    return () => {
-      if (Array.isArray(unsubscribes)) {
-        unsubscribes.forEach(unsub => unsub());
-      }
-    };
-  }, [fetchOrders]);
+    syncOrders();
+    return () => unsubscribesRef.current.forEach(unsub => unsub());
+  }, [syncOrders]);
 
-  // Auto-status progression logic (Simulation/Fallback)
+  // Auto-status simulation (Zomato-style feedback)
   useEffect(() => {
     if (activeOrders.length === 0) return;
-
     const timer = setInterval(() => {
       activeOrders.forEach(async (order) => {
-        if (order.status === 'paid') return;
-        
+        if (order.status === 'paid' || order.deliveryStatus === 'Served') return;
         const now = new Date();
         const placedAt = order.date?.toDate();
         if (!placedAt) return;
-
         const secondsElapsed = (now - placedAt) / 1000;
         const totalMinutes = order.totalCookingTime || 15;
-        
         let targetStatus = order.deliveryStatus || 'Received';
-
-        if (secondsElapsed > totalMinutes * 60) {
-          targetStatus = 'Served';
-        } else if (secondsElapsed > 60) {
-          targetStatus = 'Preparing';
-        }
-
+        if (secondsElapsed > totalMinutes * 60) targetStatus = 'Served';
+        else if (secondsElapsed > 45) targetStatus = 'Preparing';
         if (targetStatus !== order.deliveryStatus) {
-          try {
-            const orderRef = doc(db, 'bills', order.id);
-            await updateDoc(orderRef, { deliveryStatus: targetStatus });
-          } catch (err) {
-            console.error("Auto-update failed:", err);
-          }
+          try { await updateDoc(doc(db, 'bills', order.id), { deliveryStatus: targetStatus }); } catch (err) {}
         }
       });
     }, 10000);
-
     return () => clearInterval(timer);
   }, [activeOrders]);
 
@@ -109,39 +112,31 @@ const TrackOrder = () => {
     }
   };
 
-  const handleManualRefresh = () => {
-    fetchOrders();
-    toast.success('Syncing with kitchen...', {
-      icon: '🔄',
-      style: { borderRadius: '1rem', background: '#333', color: '#fff' }
-    });
-  };
-
   if (loading) {
     return (
-      <div className="p-8 space-y-10 max-w-2xl mx-auto min-h-screen bg-gray-50/30">
-        <div className="h-12 w-48 bg-gray-200 rounded-2xl animate-shimmer" />
-        <div className="space-y-8">
-          {[1, 2].map(i => <div key={i} className="h-72 bg-gray-200 rounded-[2.5rem] animate-shimmer" />)}
+      <div className="p-8 space-y-12 max-w-2xl mx-auto min-h-screen bg-white">
+        <div className="h-12 w-48 bg-gray-50 rounded-2xl animate-pulse" />
+        <div className="space-y-10">
+          {[1, 2].map(i => <div key={i} className="h-80 bg-gray-50 rounded-[3rem] animate-pulse" />)}
         </div>
       </div>
     );
   }
 
   return (
-    <div className="p-8 space-y-10 animate-in fade-in slide-in-from-bottom-8 duration-1000 pb-40 max-w-2xl mx-auto min-h-screen bg-gray-50/30">
+    <div className="p-8 space-y-10 animate-in fade-in slide-in-from-bottom-8 duration-1000 pb-40 max-w-2xl mx-auto min-h-screen bg-gray-50/20">
       <header className="flex items-center justify-between">
         <div className="flex items-center gap-6">
           <button onClick={() => navigate(-1)} className="w-12 h-12 flex items-center justify-center bg-white border border-gray-100 rounded-2xl shadow-sm active:scale-90 transition-all">
             <ArrowLeft size={24} strokeWidth={2.5} className="text-gray-900" />
           </button>
           <div>
-            <h1 className="text-3xl font-black tracking-tighter text-gray-900 uppercase leading-none">Order Tracking</h1>
-            <p className="text-[10px] text-gray-400 font-black uppercase tracking-widest mt-2">Kitchen Synchronization</p>
+            <h1 className="text-3xl font-black tracking-tighter text-gray-900 uppercase leading-none">Your Orders</h1>
+            <p className="text-[10px] text-gray-400 font-black uppercase tracking-widest mt-2">Live Tracking Center</p>
           </div>
         </div>
         <button 
-          onClick={handleManualRefresh}
+          onClick={syncOrders}
           className={`p-4 bg-white border border-gray-100 rounded-2xl shadow-sm active:scale-90 transition-all ${isRefreshing ? 'animate-spin' : ''}`}
         >
           <RotateCw size={20} strokeWidth={2.5} className="text-indigo-600" />
@@ -149,7 +144,7 @@ const TrackOrder = () => {
       </header>
 
       {activeOrders.length === 0 && pastOrders.length === 0 ? (
-        <div className="text-center py-32 space-y-10 glass rounded-[3rem] border-dashed border-2 border-gray-100 mx-auto max-w-md">
+        <div className="text-center py-32 space-y-10 glass rounded-[3.5rem] border-dashed border-2 border-gray-100 mx-auto max-w-md">
           <div className="relative w-32 h-32 mx-auto">
             <div className="absolute inset-0 bg-indigo-100 rounded-full animate-ping opacity-20" />
             <div className="relative w-32 h-32 bg-linear-to-br from-indigo-50 to-indigo-100 rounded-full flex items-center justify-center text-indigo-500 shadow-inner">
@@ -157,133 +152,127 @@ const TrackOrder = () => {
             </div>
           </div>
           <div className="space-y-3 px-8">
-            <h2 className="text-2xl font-black text-gray-900 uppercase tracking-tighter">No Culinary Logs</h2>
-            <p className="text-gray-500 text-sm font-medium leading-relaxed">Your order history is empty. Start a new session to see your records here.</p>
+            <h2 className="text-2xl font-black text-gray-900 uppercase tracking-tighter">Kitchen is Quiet</h2>
+            <p className="text-gray-400 text-sm font-medium leading-relaxed">You haven't placed any orders in this session yet. Let's fix that!</p>
           </div>
           <Link to="/menu/main" className="inline-block">
-            <Button className="px-12 py-5 shadow-2xl shadow-indigo-100 rounded-2xl">
-              Start Ordering
+            <Button className="px-12 py-5 shadow-2xl shadow-indigo-100 rounded-2xl text-xs font-black uppercase tracking-widest">
+              Explore Menu
             </Button>
           </Link>
         </div>
       ) : (
-        <div className="space-y-12">
-          {/* Active Orders Section */}
-          {activeOrders.length > 0 && (
-            <div className="space-y-8">
-              <div className="flex items-center gap-3 ml-2">
-                <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
-                <h2 className="text-xs font-black text-gray-400 uppercase tracking-[0.2em]">Live Sessions</h2>
-              </div>
-              <div className="space-y-8">
-                {activeOrders.map(order => {
-                  const step = getStatusStep(order.deliveryStatus);
-                  return (
-                    <Card key={order.id} className="overflow-hidden border-none shadow-[0_30px_60px_rgba(0,0,0,0.06)] hover:shadow-[0_40px_80px_rgba(0,0,0,0.1)] transition-all duration-700 rounded-[2.5rem]" padding="p-0">
-                      <div className="p-6 bg-linear-to-r from-indigo-600 to-violet-700 text-white flex justify-between items-center">
-                        <div className="flex items-center gap-4">
-                          <div className="bg-white/20 p-3 rounded-2xl backdrop-blur-md">
-                            <Hash size={20} strokeWidth={3} />
-                          </div>
-                          <span className="font-black text-xl tracking-tighter">{order.invoiceNumber}</span>
-                        </div>
-                        <div className="flex items-center gap-2 bg-white/20 backdrop-blur-md px-5 py-2.5 rounded-2xl text-[10px] font-black uppercase tracking-widest border border-white/10 shadow-lg">
-                          <Sparkles size={14} className="text-amber-400 animate-pulse" />
-                          {order.status}
-                        </div>
+        <div className="space-y-16">
+          {/* Active Orders - Zomato Style */}
+          {activeOrders.map(order => {
+            const step = getStatusStep(order.deliveryStatus);
+            return (
+              <div key={order.id} className="relative animate-in slide-in-from-bottom-12 duration-700">
+                <div className="absolute -top-4 -right-4 z-10">
+                  <div className="bg-indigo-600 text-white px-4 py-2 rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl flex items-center gap-2">
+                    <span className="w-2 h-2 bg-white rounded-full animate-pulse" />
+                    Live
+                  </div>
+                </div>
+                
+                <Card className="overflow-hidden border-none shadow-[0_30px_70px_rgba(0,0,0,0.08)] rounded-[3rem] bg-white" padding="p-0">
+                  <div className="p-8 bg-linear-to-br from-indigo-600 to-violet-800 text-white">
+                    <div className="flex justify-between items-start mb-8">
+                      <div>
+                        <p className="text-[10px] text-indigo-200 font-black uppercase tracking-[0.2em] mb-1.5">Order from Cafe Sunrise</p>
+                        <h2 className="text-3xl font-black tracking-tighter uppercase leading-none">#{order.invoiceNumber}</h2>
                       </div>
-
-                      <div className="p-8 space-y-12">
-                        {/* Tracker */}
-                        <div className="space-y-10">
-                          <div className="flex justify-between items-center bg-gray-50/50 p-6 rounded-[1.5rem] border border-gray-100">
-                            <div className="flex items-center gap-5">
-                              <div className="p-4 bg-white text-indigo-600 rounded-2xl shadow-sm border border-indigo-50">
-                                <Clock size={28} strokeWidth={2.5} />
-                              </div>
-                              <div>
-                                <p className="text-[10px] text-gray-400 font-black uppercase tracking-widest mb-1">Kitchen ETA</p>
-                                <p className="text-xl font-black text-gray-900 tracking-tighter">{order.totalCookingTime || 15} Mins</p>
-                              </div>
-                            </div>
-                            <div className="text-right">
-                              <p className="text-[10px] text-gray-400 font-black uppercase tracking-widest mb-1">Live Status</p>
-                              <p className="text-xl font-black text-indigo-600 uppercase tracking-tighter animate-pulse">{order.deliveryStatus || 'Received'}</p>
-                            </div>
-                          </div>
-
-                          <div className="relative px-4">
-                            <div className="absolute top-7 left-8 right-8 h-2.5 bg-gray-100 -z-10 rounded-full" />
-                            <div className="absolute top-7 left-8 h-2.5 bg-linear-to-r from-emerald-400 to-teal-500 -z-10 transition-all duration-1000 rounded-full shadow-[0_0_20px_rgba(52,211,153,0.4)]" style={{ width: `calc(${((step - 1) / 2) * 100}% - 12px)` }} />
-                            
-                            <div className="flex justify-between">
-                              {[
-                                { id: 1, label: 'Received', icon: Receipt },
-                                { id: 2, label: 'Cooking', icon: ChefHat },
-                                { id: 3, label: 'Served', icon: CheckCircle2 }
-                              ].map((item) => (
-                                <div key={item.id} className="flex flex-col items-center gap-4">
-                                  <div className={`w-16 h-16 rounded-[1.5rem] flex items-center justify-center transition-all duration-700 ${step >= item.id ? 'bg-linear-to-br from-emerald-400 to-teal-500 text-white shadow-2xl shadow-emerald-100 scale-110' : 'bg-white border border-gray-100 text-gray-300'}`}>
-                                    <item.icon size={28} strokeWidth={2.5} className={step === item.id ? 'animate-bounce' : ''} />
-                                  </div>
-                                  <span className={`text-[10px] font-black uppercase tracking-widest ${step >= item.id ? 'text-emerald-600' : 'text-gray-400'}`}>{item.label}</span>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="flex justify-between items-center border-t border-gray-100 pt-8">
-                          <div className="flex flex-col">
-                            <span className="text-[10px] text-gray-400 font-black uppercase tracking-widest leading-none mb-2">Investment</span>
-                            <span className="text-3xl font-black text-gray-900 tracking-tighter leading-none">₹{order.totalAmount?.toLocaleString()}</span>
-                          </div>
-                          <div className="px-5 py-3 bg-indigo-50 rounded-2xl border border-indigo-100 text-indigo-700 text-xs font-black uppercase tracking-widest">
-                            Table {order.tableNumber}
-                          </div>
-                        </div>
+                      <div className="w-14 h-14 bg-white/10 rounded-2xl flex items-center justify-center backdrop-blur-md border border-white/10">
+                        <Navigation size={28} className="text-indigo-100" />
                       </div>
-                    </Card>
-                  );
-                })}
-              </div>
-            </div>
-          )}
+                    </div>
+                    
+                    <div className="flex items-center gap-8">
+                      <div className="flex flex-col">
+                        <span className="text-[10px] text-indigo-300 font-black uppercase tracking-widest mb-1">Estimate</span>
+                        <span className="text-xl font-black tracking-tighter">{order.totalCookingTime || 15} Mins</span>
+                      </div>
+                      <div className="w-[1px] h-8 bg-white/20" />
+                      <div className="flex flex-col">
+                        <span className="text-[10px] text-indigo-300 font-black uppercase tracking-widest mb-1">Table</span>
+                        <span className="text-xl font-black tracking-tighter">{order.tableNumber}</span>
+                      </div>
+                    </div>
+                  </div>
 
-          {/* Past Orders Section */}
+                  <div className="p-10 space-y-12">
+                    {/* Zomato Style Step Tracker */}
+                    <div className="relative">
+                      <div className="absolute left-6 top-2 bottom-2 w-0.5 bg-gray-50 -z-0" />
+                      <div className="space-y-10 relative z-10">
+                        {[
+                          { id: 1, label: 'Order Received', desc: 'Kitchen is validating your items', icon: Receipt },
+                          { id: 2, label: 'Preparing Meal', desc: 'Chef is crafting your selection', icon: ChefHat },
+                          { id: 3, label: 'Served Hot', desc: 'Enjoy your culinary journey', icon: CheckCircle2 }
+                        ].map((item) => (
+                          <div key={item.id} className={`flex items-start gap-6 transition-all duration-700 ${step < item.id ? 'opacity-30 grayscale' : 'opacity-100'}`}>
+                            <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 shadow-lg ${step >= item.id ? 'bg-emerald-500 text-white shadow-emerald-200' : 'bg-gray-50 text-gray-300 shadow-none'}`}>
+                              <item.icon size={22} strokeWidth={2.5} className={step === item.id ? 'animate-bounce' : ''} />
+                            </div>
+                            <div className="pt-1">
+                              <h4 className="text-sm font-black text-gray-900 uppercase tracking-tight">{item.label}</h4>
+                              <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mt-1">{item.desc}</p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="pt-8 border-t border-gray-50 space-y-4">
+                      {order.items?.map((item, i) => (
+                        <div key={i} className="flex justify-between items-center text-xs">
+                          <span className="text-gray-500 font-black uppercase tracking-tight">
+                            {item.name} <span className="text-gray-300 ml-1">×{item.quantity}</span>
+                          </span>
+                          <span className="text-gray-900 font-black tracking-tighter">₹{(item.price * item.quantity).toLocaleString()}</span>
+                        </div>
+                      ))}
+                      <div className="flex justify-between items-end pt-4">
+                        <span className="text-[10px] text-gray-300 font-black uppercase tracking-widest">Grand Total</span>
+                        <span className="text-2xl font-black text-indigo-600 tracking-tighter">₹{order.totalAmount?.toLocaleString()}</span>
+                      </div>
+                    </div>
+                  </div>
+                </Card>
+              </div>
+            );
+          })}
+
+          {/* Past Sessions - Minimal & Clean */}
           {pastOrders.length > 0 && (
-            <div className="space-y-6">
-              <div className="flex items-center gap-3 ml-2">
-                <History size={16} className="text-gray-400" />
-                <h2 className="text-xs font-black text-gray-400 uppercase tracking-[0.2em]">Order History</h2>
-                <div className="h-[1px] flex-1 ml-4 bg-gray-100" />
+            <div className="space-y-8">
+              <div className="flex items-center gap-4 ml-2">
+                <History size={18} className="text-gray-400" />
+                <h2 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.25em]">Past Sessions</h2>
+                <div className="h-[1px] flex-1 bg-gray-100" />
               </div>
-              <div className="space-y-4">
+              <div className="grid grid-cols-1 gap-4">
                 {pastOrders.map(order => (
-                  <Card key={order.id} className="border border-gray-100 shadow-sm hover:shadow-md transition-all duration-300 rounded-3xl" padding="p-6">
-                    <div className="flex justify-between items-center mb-4">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-gray-50 text-indigo-600 rounded-xl flex items-center justify-center font-black text-[10px] border border-gray-100">
+                  <Card key={order.id} className="border border-gray-50 shadow-sm hover:shadow-md transition-all rounded-3xl group" padding="p-6">
+                    <div className="flex justify-between items-center">
+                      <div className="flex items-center gap-4">
+                        <div className="w-12 h-12 bg-gray-50 text-indigo-600 rounded-2xl flex items-center justify-center font-black text-xs border border-gray-100 group-hover:bg-indigo-50 transition-colors">
                           {order.tableNumber}
                         </div>
                         <div>
-                          <p className="text-xs font-black text-gray-900 tracking-tight">{order.invoiceNumber}</p>
-                          <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">
-                            {order.date?.toDate ? format(order.date.toDate(), 'dd MMM, HH:mm') : 'N/A'}
+                          <p className="text-xs font-black text-gray-900 tracking-tight uppercase">#{order.invoiceNumber}</p>
+                          <p className="text-[10px] text-gray-400 font-bold tracking-widest">
+                            {order.date?.toDate ? format(order.date.toDate(), 'dd MMM • HH:mm') : 'N/A'}
                           </p>
                         </div>
                       </div>
                       <div className="text-right">
-                        <p className="text-sm font-black text-emerald-600 tracking-tight">₹{order.totalAmount?.toLocaleString()}</p>
-                        <span className="text-[9px] font-black uppercase tracking-widest text-emerald-500/70">Completed</span>
+                        <p className="text-sm font-black text-emerald-600 tracking-tighter">₹{order.totalAmount?.toLocaleString()}</p>
+                        <div className="flex items-center justify-end gap-1 mt-0.5">
+                          <CheckCircle2 size={10} className="text-emerald-500" />
+                          <span className="text-[9px] font-black uppercase tracking-widest text-emerald-500">Paid</span>
+                        </div>
                       </div>
-                    </div>
-                    <div className="flex gap-2 flex-wrap">
-                      {order.items?.map((item, idx) => (
-                        <span key={idx} className="px-3 py-1 bg-gray-50 text-[10px] font-bold text-gray-500 rounded-full border border-gray-100">
-                          {item.name} ×{item.quantity}
-                        </span>
-                      ))}
                     </div>
                   </Card>
                 ))}
