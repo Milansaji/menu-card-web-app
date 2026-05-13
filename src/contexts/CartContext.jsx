@@ -7,9 +7,15 @@ export function useCart() {
 }
 
 export function CartProvider({ children }) {
-  const [cart, setCart] = useState([]);
+  const [cart, setCart] = useState(() => JSON.parse(localStorage.getItem('currentCart') || '[]'));
   const [totalItems, setTotalItems] = useState(0);
   const [tableNumber, setTableNumber] = useState(() => localStorage.getItem('currentTable'));
+
+  useEffect(() => {
+    localStorage.setItem('currentCart', JSON.stringify(cart));
+    const count = cart.reduce((acc, item) => acc + item.quantity, 0);
+    setTotalItems(count);
+  }, [cart]);
 
   useEffect(() => {
     if (tableNumber) {
@@ -18,11 +24,6 @@ export function CartProvider({ children }) {
       localStorage.removeItem('currentTable');
     }
   }, [tableNumber]);
-
-  useEffect(() => {
-    const count = cart.reduce((acc, item) => acc + item.quantity, 0);
-    setTotalItems(count);
-  }, [cart]);
 
   function addToCart(product) {
     setCart(prevCart => {

@@ -3,7 +3,7 @@ import { db } from '../../firebase/firebase';
 import { collection, onSnapshot, query, where, getDoc, doc } from 'firebase/firestore';
 import { useCart } from '../../contexts/CartContext';
 import { useSearchParams, Link } from 'react-router-dom';
-import { Search, Plus, Star, Clock, Hash, Receipt } from 'lucide-react';
+import { Search, Plus, Star, Clock, Hash, Receipt, ArrowLeft, ChefHat } from 'lucide-react';
 import Card from '../../components/Card';
 import { toast } from 'react-hot-toast';
 
@@ -14,8 +14,29 @@ const DigitalMenu = () => {
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
+  const [activeOrder, setActiveOrder] = useState(null);
   const [searchParams] = useSearchParams();
   const { addToCart, setTableNumber, tableNumber, clearCart } = useCart();
+
+  useEffect(() => {
+    // Check for active orders in localStorage
+    const orderIds = JSON.parse(localStorage.getItem('myOrders') || '[]');
+    if (orderIds.length > 0) {
+      // Check the latest order status
+      const latestId = orderIds[orderIds.length - 1];
+      const unsub = onSnapshot(doc(db, 'bills', latestId), (snapshot) => {
+        if (snapshot.exists()) {
+          const data = snapshot.data();
+          if (data.status !== 'paid' && String(data.tableNumber) === String(tableNumber)) {
+            setActiveOrder({ id: snapshot.id, ...data });
+          } else {
+            setActiveOrder(null);
+          }
+        }
+      });
+      return () => unsub();
+    }
+  }, [tableNumber]);
 
   useEffect(() => {
     const table = searchParams.get('table');
@@ -99,6 +120,30 @@ const DigitalMenu = () => {
           {!tableNumber && <span className="font-black text-indigo-600">Menu</span>}
         </div>
       </div>
+
+      {/* Active Order Banner */}
+      {activeOrder && (
+        <div className="mx-6 animate-in slide-in-from-top-4 duration-500">
+          <Link 
+            to="/track-order"
+            className="flex items-center justify-between p-4 bg-green-50 border border-green-100 rounded-2xl shadow-sm hover:shadow-md transition-all group"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-green-500 text-white rounded-xl flex items-center justify-center animate-pulse">
+                <ChefHat size={20} />
+              </div>
+              <div>
+                <p className="text-[10px] text-green-600 font-black uppercase tracking-widest">Active Order Detected</p>
+                <p className="text-sm font-bold text-green-900">Stage: {activeOrder.deliveryStatus || 'Received'}</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-1 text-green-600 font-bold text-xs">
+              Track Status
+              <ArrowLeft size={14} className="rotate-180 group-hover:translate-x-1 transition-transform" />
+            </div>
+          </Link>
+        </div>
+      )}
 
       {/* Hero Section */}
       <div className="relative h-48 bg-indigo-600 overflow-hidden mx-6 rounded-3xl mt-4">
