@@ -42,14 +42,25 @@ const DigitalMenu = () => {
   useEffect(() => {
     const table = searchParams.get('table');
     if (table && table !== tableNumber) {
-      clearCart();
+      // Clear cart only if table actually changes to prevent accidental loss
+      if (tableNumber) {
+        clearCart();
+        toast.success(`Welcome to Table ${table}`, {
+          icon: '🪑',
+          style: { borderRadius: '1rem', background: '#333', color: '#fff' }
+        });
+      } else {
+        toast.success(`Linked to Table ${table}`, {
+          icon: '🔗',
+          style: { borderRadius: '1rem', background: '#333', color: '#fff' }
+        });
+      }
+      
       setTableNumber(table);
-      toast.success(`Welcome to Table ${table}`, {
-        icon: '🪑',
-        style: { borderRadius: '1rem', background: '#333', color: '#fff' }
-      });
+      // Explicit mobile persistence
+      localStorage.setItem('currentTable', table);
     }
-  }, [searchParams, tableNumber]);
+  }, [searchParams, tableNumber, setTableNumber, clearCart]);
 
   const syncMenu = useCallback(() => {
     setIsSyncing(true);
