@@ -9,7 +9,7 @@ const initAudio = () => {
     audioCtx = new (window.AudioContext || window.webkitAudioContext)();
   }
   if (audioCtx.state === 'suspended') {
-    audioCtx.current.resume();
+    audioCtx.resume();
   }
   return audioCtx;
 };

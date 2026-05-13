@@ -72,7 +72,9 @@ const Orders = () => {
   }, []);
 
   useEffect(() => {
-    if (!isKitchenActive || orders.length <= prevOrdersCount.current || prevOrdersCount.current === 0) {
+    // Sound Trigger Logic:
+    // Trigger if count increased (new order arrived)
+    if (!isKitchenActive || orders.length <= prevOrdersCount.current) {
       prevOrdersCount.current = orders.length;
       return;
     }

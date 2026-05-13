@@ -67,6 +67,23 @@ const TrackOrder = () => {
         String(order.tableNumber).trim() === String(tableNumber || '').trim()
       );
       
+      // AUTO-ADOPT: Ensure these orders are in local history so they survive the "Paid" transition
+      if (tableMatch.length > 0) {
+        const existingHistory = JSON.parse(localStorage.getItem('myOrders') || '[]');
+        let updated = false;
+        tableMatch.forEach(order => {
+          if (!existingHistory.includes(order.id)) {
+            existingHistory.push(order.id);
+            updated = true;
+          }
+        });
+        if (updated) {
+          localStorage.setItem('myOrders', JSON.stringify(existingHistory));
+          // Trigger a re-sync to start listeners for the newly adopted IDs
+          syncOrders();
+        }
+      }
+
       setActiveOrders(prev => {
         const personalOnly = prev.filter(p => !tableMatch.some(t => t.id === p.id));
         return [...tableMatch, ...personalOnly].sort((a, b) => (b.date?.seconds || 0) - (a.date?.seconds || 0));
