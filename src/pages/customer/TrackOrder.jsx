@@ -32,19 +32,19 @@ const TrackOrder = () => {
       if (!Array.isArray(personalOrderIds)) personalOrderIds = [];
     } catch (e) { personalOrderIds = []; }
 
-    // 1. Listen for Table-wide Active Orders (The "Zomato" experience - anyone at the table sees the status)
+    // 1. Table-wide Active Orders (Production-Hardened Equality Query)
+    // Using '==' instead of '!=' to avoid requiring manual composite indexes in Firestore production
     if (tableNumber) {
       const tableQuery = query(
         collection(db, 'bills'), 
         where('tableNumber', '==', String(tableNumber)),
-        where('status', '!=', 'paid')
+        where('status', '==', 'pending') // Only fetch unpaid bills
       );
 
       const unsubTable = onSnapshot(tableQuery, (snapshot) => {
         const tableActiveOrders = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         
         setActiveOrders(prev => {
-          // Merge table orders with personal orders, avoiding duplicates
           const personalOnly = prev.filter(p => !tableActiveOrders.some(t => t.id === p.id));
           return [...tableActiveOrders, ...personalOnly].sort((a, b) => (b.date?.seconds || 0) - (a.date?.seconds || 0));
         });
@@ -52,13 +52,14 @@ const TrackOrder = () => {
         setLoading(false);
         setIsRefreshing(false);
       }, (err) => {
-        console.error("Table sync error:", err);
+        console.error("Table sync error (Check Firestore Indexes if this persists):", err);
         setLoading(false);
+        setIsRefreshing(false);
       });
       unsubscribesRef.current.push(unsubTable);
     }
 
-    // 2. Listen for Personal Order History (IDs stored on this device)
+    // 2. Personal History (Specific Doc Listeners)
     personalOrderIds.forEach(id => {
       const unsubPersonal = onSnapshot(doc(db, 'bills', id), (snapshot) => {
         if (snapshot.exists()) {
@@ -66,14 +67,12 @@ const TrackOrder = () => {
           const orderObj = { id: snapshot.id, ...data };
 
           if (data.status === 'paid') {
-            // Move to history if paid
             setActiveOrders(prev => prev.filter(o => o.id !== id));
             setPastOrders(prev => {
               const other = prev.filter(o => o.id !== id);
               return [...other, orderObj].sort((a, b) => (b.date?.seconds || 0) - (a.date?.seconds || 0));
             });
           } else {
-            // Update active orders
             setActiveOrders(prev => {
               const other = prev.filter(o => o.id !== id);
               return [...other, orderObj].sort((a, b) => (b.date?.seconds || 0) - (a.date?.seconds || 0));
@@ -82,11 +81,13 @@ const TrackOrder = () => {
         }
         setLoading(false);
         setIsRefreshing(false);
+      }, (err) => {
+        console.error(`Doc listener failed for ${id}:`, err);
+        setLoading(false);
       });
       unsubscribesRef.current.push(unsubPersonal);
     });
 
-    // Fallback if no table and no history
     if (!tableNumber && personalOrderIds.length === 0) {
       setLoading(false);
       setIsRefreshing(false);
@@ -98,7 +99,6 @@ const TrackOrder = () => {
     return () => unsubscribesRef.current.forEach(unsub => unsub());
   }, [syncOrders]);
 
-  // Auto-status simulation
   useEffect(() => {
     if (activeOrders.length === 0) return;
     const timer = setInterval(() => {
