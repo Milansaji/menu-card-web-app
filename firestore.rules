@@ -1,0 +1,38 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Basic auth check
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Settings: Public read, Auth write
+    match /settings/{docId} {
+      allow read: if true;
+      allow write: if isAuthenticated();
+    }
+
+    // Categories: Public read, Auth write
+    match /categories/{docId} {
+      allow read: if true;
+      allow write: if isAuthenticated();
+    }
+
+    // Products: Public read, Auth write
+    match /products/{docId} {
+      allow read: if true;
+      allow write: if isAuthenticated();
+    }
+
+    // Bills: Admin full access, Public can create (for self-ordering)
+    match /bills/{docId} {
+      allow read, update, delete: if isAuthenticated();
+      allow create: if true;
+    }
+
+    // Users: Auth full access
+    match /users/{userId} {
+      allow read, write: if isAuthenticated();
+    }
+  }
+}
