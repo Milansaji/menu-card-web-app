@@ -107,19 +107,7 @@ const DigitalMenu = () => {
   }
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-700 pb-24">
-      {/* Sticky Top Bar */}
-      <div className="sticky top-0 z-50 bg-white/80 backdrop-blur-xl border-b border-gray-100 px-6 py-3 flex items-center justify-between shadow-sm">
-        <div className="flex items-center gap-2">
-          {tableNumber && (
-            <div className="flex items-center gap-1.5 bg-indigo-600 text-white px-4 py-1.5 rounded-full text-xs font-black shadow-lg shadow-indigo-100">
-              <Hash size={14} />
-              TABLE {tableNumber}
-            </div>
-          )}
-          {!tableNumber && <span className="font-black text-indigo-600">Menu</span>}
-        </div>
-      </div>
+    <div className="space-y-6 animate-in fade-in duration-700 pb-24 pt-4">
 
       {/* Active Order Banner */}
       {activeOrder && (

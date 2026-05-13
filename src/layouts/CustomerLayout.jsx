@@ -1,20 +1,28 @@
 import React from 'react';
 import { Outlet, Link } from 'react-router-dom';
 import { useCart } from '../contexts/CartContext';
-import { ShoppingCart, Menu as MenuIcon, Receipt } from 'lucide-react';
+import { ShoppingCart, Menu as MenuIcon, Receipt, Hash } from 'lucide-react';
 
 const CustomerLayout = () => {
-  const { totalItems } = useCart();
+  const { totalItems, tableNumber } = useCart();
 
   return (
     <div className="min-h-screen bg-white flex flex-col">
       {/* Header */}
       <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-gray-100 px-4 py-3 flex items-center justify-between">
-        <Link to="/" className="flex items-center gap-2">
+        <Link to="/menu/main" className="flex items-center gap-2">
           <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center">
             <MenuIcon className="text-white" size={18} />
           </div>
-          <span className="font-bold text-lg text-gray-900 tracking-tight">FoodieMenu</span>
+          <div className="flex flex-col">
+            <span className="font-bold text-sm text-gray-900 leading-tight">FoodieMenu</span>
+            {tableNumber && (
+              <span className="text-[10px] font-black text-indigo-600 flex items-center gap-0.5">
+                <Hash size={10} />
+                TABLE {tableNumber}
+              </span>
+            )}
+          </div>
         </Link>
 
         <Link 

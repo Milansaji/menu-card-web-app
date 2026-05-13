@@ -14,16 +14,39 @@ const Orders = () => {
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   
-  // Filter states
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('pending');
   const [dateFilter, setDateFilter] = useState('all');
+  const [stats, setStats] = useState({
+    todaySales: 0,
+    pendingOrders: 0,
+    todayCount: 0
+  });
+
+  const prevOrdersCount = React.useRef(0);
 
   useEffect(() => {
     const q = query(collection(db, 'bills'), orderBy('date', 'desc'));
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      setOrders(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      const newOrders = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setOrders(newOrders);
       setLoading(false);
+
+      // Sound notification logic
+      if (newOrders.length > prevOrdersCount.current && prevOrdersCount.current !== 0) {
+        const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
+        audio.play().catch(e => console.log('Audio play blocked'));
+        toast('New Order Received!', { icon: '🔔', position: 'top-right' });
+      }
+      prevOrdersCount.current = newOrders.length;
+
+      // Calculate Stats
+      const today = newOrders.filter(o => o.date?.toDate && isToday(o.date.toDate()));
+      setStats({
+        todaySales: today.reduce((acc, o) => acc + (o.totalAmount || 0), 0),
+        pendingOrders: newOrders.filter(o => o.status === 'pending').length,
+        todayCount: today.length
+      });
     });
     return () => unsubscribe();
   }, []);
@@ -88,23 +111,52 @@ const Orders = () => {
     <div className="space-y-6 animate-in fade-in duration-500">
       <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Orders History</h1>
-          <p className="text-gray-500 mt-1">Manage incoming table orders and payments.</p>
+          <h1 className="text-3xl font-bold text-gray-900 tracking-tight">Order Command Center</h1>
+          <p className="text-gray-500 mt-1">Real-time monitoring of kitchen and payments.</p>
         </div>
-        <div className="flex gap-2">
-          <div className="bg-indigo-50 px-4 py-2 rounded-xl border border-indigo-100 flex items-center gap-3">
-            <div className="text-right">
-              <p className="text-[10px] text-indigo-400 font-black uppercase tracking-wider">Filtered</p>
-              <p className="text-indigo-600 font-bold text-xl leading-none">{filteredOrders.length}</p>
-            </div>
-            <div className="w-px h-8 bg-indigo-200" />
-            <div className="text-right">
-              <p className="text-[10px] text-indigo-400 font-black uppercase tracking-wider">Total</p>
-              <p className="text-indigo-600 font-bold text-xl leading-none">{orders.length}</p>
+        <div className="flex gap-3">
+          <div className="bg-indigo-600 text-white p-3 rounded-2xl shadow-lg shadow-indigo-100 flex items-center gap-3">
+            <IndianRupee size={24} />
+            <div>
+              <p className="text-[10px] opacity-70 font-black uppercase tracking-wider leading-none">Today's Sales</p>
+              <p className="text-xl font-black">₹{stats.todaySales.toFixed(2)}</p>
             </div>
           </div>
         </div>
       </header>
+
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="bg-white p-4 rounded-3xl border border-gray-100 shadow-sm flex items-center gap-4">
+          <div className="w-12 h-12 bg-orange-100 text-orange-600 rounded-2xl flex items-center justify-center">
+            <ChefHat size={24} />
+          </div>
+          <div>
+            <p className="text-xs text-gray-400 font-bold uppercase tracking-widest">Active Orders</p>
+            <p className="text-2xl font-black text-gray-900">{stats.pendingOrders}</p>
+          </div>
+        </div>
+        <div className="bg-white p-4 rounded-3xl border border-gray-100 shadow-sm flex items-center gap-4">
+          <div className="w-12 h-12 bg-green-100 text-green-600 rounded-2xl flex items-center justify-center">
+            <CheckCircle2 size={24} />
+          </div>
+          <div>
+            <p className="text-xs text-gray-400 font-bold uppercase tracking-widest">Today's Count</p>
+            <p className="text-2xl font-black text-gray-900">{stats.todayCount}</p>
+          </div>
+        </div>
+        <div className="bg-white p-4 rounded-3xl border border-gray-100 shadow-sm flex items-center gap-4">
+          <div className="w-12 h-12 bg-indigo-100 text-indigo-600 rounded-2xl flex items-center justify-center">
+            <ShoppingBag size={24} />
+          </div>
+          <div>
+            <p className="text-xs text-gray-400 font-bold uppercase tracking-widest">Success Rate</p>
+            <p className="text-2xl font-black text-gray-900">
+              {orders.length > 0 ? Math.round((orders.filter(o => o.status === 'paid').length / orders.length) * 100) : 0}%
+            </p>
+          </div>
+        </div>
+      </div>
 
       {/* Filters Bar */}
       <Card className="flex flex-col md:flex-row gap-4 p-4 border-none shadow-sm" padding="p-4">
